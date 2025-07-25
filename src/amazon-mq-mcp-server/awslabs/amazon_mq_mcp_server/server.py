@@ -107,7 +107,7 @@ def allow_mutative_action_only_on_tagged_resource(
 # instantiate base server
 mcp = FastMCP(
     'awslabs.amazon-mq-mcp-server',
-    instructions="""Manage RabbitMQ and ActiveMQ message brokers on AmazonMQ.""",
+    instructions="Manage RabbitMQ and ActiveMQ message brokers on AmazonMQ.",
     dependencies=['pydantic', 'boto3'],
 )
 

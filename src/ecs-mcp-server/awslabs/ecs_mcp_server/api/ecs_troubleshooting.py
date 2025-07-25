@@ -21,7 +21,7 @@ that were previously available as separate tools.
 
 import inspect
 import logging
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Literal, Optional, Union
 
 from awslabs.ecs_mcp_server.api.troubleshooting_tools.detect_image_pull_failures import (
     detect_image_pull_failures,
@@ -44,6 +44,7 @@ from awslabs.ecs_mcp_server.api.troubleshooting_tools.fetch_task_logs import (
 from awslabs.ecs_mcp_server.api.troubleshooting_tools.get_ecs_troubleshooting_guidance import (
     get_ecs_troubleshooting_guidance,
 )
+from awslabs.ecs_mcp_server.utils import schemas
 
 logger = logging.getLogger(__name__)
 
@@ -62,60 +63,50 @@ TroubleshootingAction = Literal[
 ACTIONS = {
     "get_ecs_troubleshooting_guidance": {
         "func": get_ecs_troubleshooting_guidance,
-        "required_params": ["access_key", "secret_access_key", "app_name"],
+        "required_params": ["creds", "app_name"],
         "optional_params": ["symptoms_description"],
-        "transformer": lambda app_name, access_key, secret_access_key, params: {
+        "transformer": lambda creds, app_name, params: {
+            "creds": creds,
             "app_name": app_name,
-            "access_key": access_key,
-            "secret_access_key": secret_access_key,
             "symptoms_description": params.get("symptoms_description"),
         },
         "description": "Initial assessment and data collection",
         "param_descriptions": {
-            "access_key": "AWS access key for authenticating the request",
-            "secret_access_key": "AWS secret access key for authenticating the request",
+            "creds": "AWS credentials dict or model",
             "app_name": "The name of the application/stack to troubleshoot",
             "symptoms_description": "Description of symptoms experienced by the user",
         },
         "example": (
             'action="get_ecs_troubleshooting_guidance", '
-            'parameters={'
-            '"access_key": "<your-access-key>", '
-            '"secret_access_key": "<your-secret-access-key>", '
-            '"app_name": "my-app", '
-            '"symptoms_description": "ALB returning 503 errors"}'
+            'creds={"access_key":"<key>","secret_access_key":"<secret>"}, '
+            'parameters={"app_name":"my-app","symptoms_description":"ALB 503"}'
         ),
     },
     "fetch_cloudformation_status": {
         "func": fetch_cloudformation_status,
-        "required_params": ["access_key", "secret_access_key", "stack_id"],
+        "required_params": ["creds", "stack_id"],
         "optional_params": [],
-        "transformer": lambda stack_id, access_key, secret_access_key, params: {
-            "stack_id": stack_id,
-            "access_key": access_key,
-            "secret_access_key": secret_access_key,
+        "transformer": lambda creds, _, params: {
+            "creds": creds,
+            "stack_id": params["stack_id"],
         },
         "description": "Infrastructure-level diagnostics for CloudFormation stacks",
         "param_descriptions": {
-            "access_key": "AWS access key for authenticating the request",
-            "secret_access_key": "AWS secret access key for authenticating the request",
+            "creds": "AWS credentials dict or model",
             "stack_id": "The CloudFormation stack identifier to analyze",
         },
         "example": (
             'action="fetch_cloudformation_status", '
-            'parameters={'
-            '"access_key": "<your-access-key>", '
-            '"secret_access_key": "<your-secret-access-key>", '
-            '"stack_id": "my-app-stack"}'
+            'creds={"access_key":"<key>","secret_access_key":"<secret>"}, '
+            'parameters={"stack_id":"my-stack"}'
         ),
     },
     "fetch_service_events": {
         "func": fetch_service_events,
-        "required_params": ["access_key", "secret_access_key", "app_name", "cluster_name", "service_name"],
+        "required_params": ["creds", "app_name", "cluster_name", "service_name"],
         "optional_params": ["time_window", "start_time", "end_time"],
-        "transformer": lambda app_name, access_key, secret_access_key, params: {
-            "access_key": access_key,
-            "secret_access_key": secret_access_key,
+        "transformer": lambda creds, app_name, params: {
+            "creds": creds,
             "app_name": app_name,
             "cluster_name": params["cluster_name"],
             "service_name": params["service_name"],
@@ -125,38 +116,26 @@ ACTIONS = {
         },
         "description": "Service-level diagnostics for ECS services",
         "param_descriptions": {
-            "access_key": "AWS access key for authenticating the request",
-            "secret_access_key": "AWS secret access key for authenticating the request",
+            "creds": "AWS credentials dict or model",
             "app_name": "The name of the application to analyze",
             "cluster_name": "The name of the ECS cluster",
             "service_name": "The name of the ECS service to analyze",
-            "time_window": "Time window in seconds to look back for events (default: 3600)",
-            "start_time": (
-                "Explicit start time for the analysis window "
-                "(UTC, takes precedence over time_window if provided)"
-            ),
-            "end_time": (
-                "Explicit end time for the analysis window "
-                "(UTC, defaults to current time if not provided)"
-            ),
+            "time_window": "Time window in seconds to look back for events",
+            "start_time": "Explicit start time for analysis (UTC)",
+            "end_time": "Explicit end time for analysis (UTC)",
         },
         "example": (
-            'action="fetch_service_events", parameters={'
-            '"access_key": "<your-access-key>", '
-            '"secret_access_key": "<your-secret-access-key>", '
-            '"app_name": "my-app", '
-            '"cluster_name": "my-cluster", '
-            '"service_name": "my-service", '
-            '"time_window": 7200}'
+            'action="fetch_service_events", '
+            'creds={"access_key":"<key>","secret_access_key":"<secret>"}, '
+            'parameters={"app_name":"my-app","cluster_name":"c","service_name":"s","time_window":7200}'
         ),
     },
     "fetch_task_failures": {
         "func": fetch_task_failures,
-        "required_params": ["access_key", "secret_access_key", "app_name", "cluster_name"],
+        "required_params": ["creds", "app_name", "cluster_name"],
         "optional_params": ["time_window", "start_time", "end_time"],
-        "transformer": lambda app_name, access_key, secret_access_key, params: {
-            "access_key": access_key,
-            "secret_access_key": secret_access_key,
+        "transformer": lambda creds, app_name, params: {
+            "creds": creds,
             "app_name": app_name,
             "cluster_name": params["cluster_name"],
             "time_window": params.get("time_window", 3600),
@@ -165,37 +144,25 @@ ACTIONS = {
         },
         "description": "Task-level diagnostics for ECS task failures",
         "param_descriptions": {
-            "access_key": "AWS access key for authenticating the request",
-            "secret_access_key": "AWS secret access key for authenticating the request",
+            "creds": "AWS credentials dict or model",
             "app_name": "The name of the application to analyze",
             "cluster_name": "The name of the ECS cluster",
-            "time_window": "Time window in seconds to look back for failures (default: 3600)",
-            "start_time": (
-                "Explicit start time for the analysis window "
-                "(UTC, takes precedence over time_window if provided)"
-            ),
-            "end_time": (
-                "Explicit end time for the analysis window "
-                "(UTC, defaults to current time if not provided)"
-            ),
+            "time_window": "Time window in seconds to look back for failures", 
+            "start_time": "Explicit start time for analysis (UTC)",
+            "end_time": "Explicit end time for analysis (UTC)",
         },
         "example": (
             'action="fetch_task_failures", '
-            'parameters={'
-            '"access_key": "<your-access-key>", '
-            '"secret_access_key": "<your-secret-access-key>", '
-            '"app_name": "my-app", '
-            '"cluster_name": "my-cluster", '
-            '"time_window": 3600}'
+            'creds={"access_key":"<key>","secret_access_key":"<secret>"}, '
+            'parameters={"app_name":"my-app","cluster_name":"c","time_window":3600}'
         ),
     },
     "fetch_task_logs": {
         "func": fetch_task_logs,
-        "required_params": ["access_key", "secret_access_key", "app_name", "cluster_name"],
+        "required_params": ["creds", "app_name", "cluster_name"],
         "optional_params": ["task_id", "time_window", "filter_pattern", "start_time", "end_time"],
-        "transformer": lambda app_name, access_key, secret_access_key, params: {
-            "access_key": access_key,
-            "secret_access_key": secret_access_key,
+        "transformer": lambda creds, app_name, params: {
+            "creds": creds,
             "app_name": app_name,
             "cluster_name": params["cluster_name"],
             "task_id": params.get("task_id"),
@@ -206,83 +173,61 @@ ACTIONS = {
         },
         "description": "Application-level diagnostics through CloudWatch logs",
         "param_descriptions": {
-            "access_key": "AWS access key for authenticating the request",
-            "secret_access_key": "AWS secret access key for authenticating the request",
+            "creds": "AWS credentials dict or model",
             "app_name": "The name of the application to analyze",
             "cluster_name": "The name of the ECS cluster",
             "task_id": "Specific task ID to retrieve logs for",
-            "time_window": "Time window in seconds to look back for logs (default: 3600)",
+            "time_window": "Time window in seconds to look back for logs",
             "filter_pattern": "CloudWatch logs filter pattern",
-            "start_time": (
-                "Explicit start time for the analysis window "
-                "(UTC, takes precedence over time_window if provided)"
-            ),
-            "end_time": (
-                "Explicit end time for the analysis window "
-                "(UTC, defaults to current time if not provided)"
-            ),
+            "start_time": "Explicit start time for analysis (UTC)",
+            "end_time": "Explicit end time for analysis (UTC)",
         },
         "example": (
             'action="fetch_task_logs", '
-            'parameters={'
-            '"access_key": "<your-access-key>", '
-            '"secret_access_key": "<your-secret-access-key>", '
-            '"app_name": "my-app", '
-            '"cluster_name": "my-cluster", '
-            '"filter_pattern": "ERROR", '
-            '"time_window": 1800}'
+            'creds={"access_key":"<key>","secret_access_key":"<secret>"}, '
+            'parameters={"app_name":"my-app","cluster_name":"c","filter_pattern":"ERROR","time_window":1800}'
         ),
     },
     "detect_image_pull_failures": {
         "func": detect_image_pull_failures,
-        "required_params": ["access_key", "secret_access_key", "app_name"],
+        "required_params": ["creds", "app_name"],
         "optional_params": [],
-        "transformer": lambda app_name, access_key, secret_access_key, params: {
-            "access_key": access_key,
-            "secret_access_key": secret_access_key,
+        "transformer": lambda creds, app_name, params: {
+            "creds": creds,
             "app_name": app_name,
         },
         "description": "Specialized tool for detecting container image pull failures",
         "param_descriptions": {
-            "access_key": "AWS access key for authenticating the request",
-            "secret_access_key": "AWS secret access key for authenticating the request",
+            "creds": "AWS credentials dict or model",
             "app_name": "Application name to check for image pull failures",
         },
         "example": (
             'action="detect_image_pull_failures", '
-            'parameters={'
-            '"access_key": "<your-access-key>", '
-            '"secret_access_key": "<your-secret-access-key>", '
-            '"app_name": "my-app"}'
+            'creds={"access_key":"<key>","secret_access_key":"<secret>"}, '
+            'parameters={"app_name":"my-app"}'
         ),
     },
     "fetch_network_configuration": {
         "func": fetch_network_configuration,
-        "required_params": ["access_key", "secret_access_key", "app_name"],
+        "required_params": ["creds", "app_name"],
         "optional_params": ["vpc_id", "cluster_name"],
-        "transformer": lambda app_name, access_key, secret_access_key, params: {
-            "access_key": access_key,
-            "secret_access_key": secret_access_key,
+        "transformer": lambda creds, app_name, params: {
+            "creds": creds,
             "app_name": app_name,
             "vpc_id": params.get("vpc_id"),
             "cluster_name": params.get("cluster_name"),
         },
         "description": "Network-level diagnostics for ECS deployments",
         "param_descriptions": {
-            "access_key": "AWS access key for authenticating the request",
-            "secret_access_key": "AWS secret access key for authenticating the request",
+            "creds": "AWS credentials dict or model",
             "app_name": "The name of the application to analyze",
             "vpc_id": "Specific VPC ID to analyze",
             "cluster_name": "Specific ECS cluster name",
         },
         "example": (
             'action="fetch_network_configuration", '
-            'parameters={'
-            '"access_key": "<your-access-key>", '
-            '"secret_access_key": "<your-secret-access-key>", '
-            '"app_name": "my-app", '
-            '"vpc_id": "vpc-12345678", '
-            '"cluster_name": "my-cluster"}'
+            'creds={"access_key":"<key>","secret_access_key":"<secret>"}, '
+            'parameters={"app_name":"my-app","vpc_id":"vpc-123","cluster_name":"c"}'
         ),
     },
 }
@@ -381,24 +326,29 @@ def _validate_action(action: str) -> None:
         raise ValueError(f"Invalid action '{action}'. Valid actions: {valid_actions}")
 
 
-def _validate_parameters(access_key: str, secret_access_key: str, action: str, app_name: Optional[str], parameters: Dict[str, Any],
+
+def _validate_parameters(
+    creds: Dict[str, Any],
+    action: str,
+    app_name: Optional[str],
+    parameters: Dict[str, Any],
 ) -> None:
     """Validate required parameters (including AWS creds) for the given action."""
     required = ACTIONS[action]["required_params"]
 
-    # Validate app_name if it’s in the required list
-    if "app_name" in required and (not app_name or not app_name.strip()):
-        raise ValueError(f"app_name is required for action '{action}'")
-
-    # Validate AWS creds if they’re required
-    if "access_key" in required and not access_key:
+    # Ensure credential keys exist if required
+    if "access_key" in required and not creds.get("access_key"):
         raise ValueError(f"access_key is required for action '{action}'")
-    if "secret_access_key" in required and not secret_access_key:
+    if "secret_access_key" in required and not creds.get("secret_access_key"):
         raise ValueError(f"secret_access_key is required for action '{action}'")
 
-    # Validate any other required params
+    # Validate app_name
+    if "app_name" in required and not app_name:
+        raise ValueError(f"app_name is required for action '{action}'")
+
+    # Validate other required parameters
     for param in required:
-        if param in ("app_name", "access_key", "secret_access_key"):
+        if param in ("access_key", "secret_access_key", "app_name"):
             continue
         if param not in parameters:
             raise ValueError(f"Missing required parameter '{param}' for action '{action}'")
@@ -409,8 +359,7 @@ TROUBLESHOOTING_DOCS = generate_troubleshooting_docs()
 
 
 async def ecs_troubleshooting_tool(
-    access_key: str,
-    secret_access_key: str,
+    creds: Union[schemas.AwsCredentials, Dict[str, Any]],
     app_name: Optional[str] = None,
     action: TroubleshootingAction = "get_ecs_troubleshooting_guidance",
     parameters: Optional[Dict[str, Any]] = None,
@@ -418,24 +367,15 @@ async def ecs_troubleshooting_tool(
     """
     ECS troubleshooting tool.
 
-    This tool provides access to all ECS troubleshooting operations through a single
-    interface. Use the 'action' parameter to specify which troubleshooting operation
-    to perform.
-
     Args:
+        creds: AWS credentials (AwsCredentials model or dict with access_key & secret_access_key)
         app_name: Application/stack name (required for most actions)
-        access_key: AWS access key for authenticating the request
-        secret_access_key: AWS secret access key for authenticating the request
         action: The troubleshooting action to perform
         parameters: Action-specific parameters
 
     Returns:
         Results from the selected troubleshooting action
-
-    Raises:
-        ValueError: If action is invalid or required parameters are missing
     """
-    # NOTE: The full documentation is available in the TROUBLESHOOTING_DOCS variable
     try:
         if parameters is None:
             parameters = {}
@@ -443,7 +383,10 @@ async def ecs_troubleshooting_tool(
         # Validate action
         _validate_action(action)
 
-        # Check security permissions for sensitive data actions
+        # Ensure raw creds dict
+        raw_creds = creds.model_dump() if isinstance(creds, schemas.AwsCredentials) else creds
+
+        # Check permissions for sensitive actions
         sensitive_data_actions = [
             "fetch_task_logs",
             "fetch_service_events",
@@ -451,45 +394,25 @@ async def ecs_troubleshooting_tool(
             "fetch_network_configuration",
         ]
         if action in sensitive_data_actions:
-            # Import here to avoid circular imports
             from awslabs.ecs_mcp_server.utils.config import get_config
 
-            # Check if sensitive data access is allowed
             config = get_config()
             if not config.get("allow-sensitive-data", False):
-                return {
-                    "status": "error",
-                    "error": (
-                        f"Action {action} is not allowed without ALLOW_SENSITIVE_DATA=true "
-                        f"in your environment due to potential exposure of sensitive information."
-                    ),
-                }
+                return {"status": "error", "error": f"Action {action} not allowed"}
 
-        # Validate parameters (and AWS creds)
-        _validate_parameters(
-            access_key,
-            secret_access_key,
-            action,
-            app_name,
-            parameters,
-        )
+        # Validate parameters including creds
+        _validate_parameters(raw_creds, action, app_name, parameters)
 
-        # Get action configuration
-        action_config = ACTIONS[action]
+        # Call underlying function, always passing creds plus any args
+        func = ACTIONS[action]["func"]
+        call_args: Dict[str, Any] = {"creds": raw_creds}
+        if app_name is not None:
+            call_args["app_name"] = app_name
+        call_args.update(parameters)
 
-        # Transform parameters using action-specific transformer
-        func_params = action_config["transformer"](
-            app_name,
-            access_key,
-            secret_access_key,
-            parameters
-        )
-
-        # Call the function and await it if it's a coroutine
-        result = action_config["func"](**func_params)
+        result = func(**call_args)
         if inspect.iscoroutine(result):
             result = await result
-
         return result
 
     except ValueError as e:

@@ -25,8 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 async def get_deployment_status(
-    access_key: str,
-    secret_access_key: str,
+    credentials: Dict[str, Any],
     app_name: str,
     cluster_name: Optional[str] = None,
     stack_name: Optional[str] = None,
@@ -59,7 +58,7 @@ async def get_deployment_status(
     service_name_to_check = service_name or f"{app_name}-service"
 
     # Get CloudFormation stack status
-    cfn_stack_name, stack_status = await _find_cloudformation_stack(access_key, secret_access_key, app_name, stack_name)
+    cfn_stack_name, stack_status = await _find_cloudformation_stack(credentials, app_name, stack_name)
 
     # If stack doesn't exist or is in a failed state, return early
     if not cfn_stack_name or stack_status.get("status") in [
@@ -79,10 +78,10 @@ async def get_deployment_status(
         }
 
     # Get ALB URL
-    alb_url = await _get_alb_url(access_key, secret_access_key, app_name, cfn_stack_name)
+    alb_url = await _get_alb_url(credentials, app_name, cfn_stack_name)
 
     # Get service status
-    ecs_client = await get_aws_client(access_key, secret_access_key, "ecs")
+    ecs_client = await get_aws_client(credentials, "ecs")
     try:
         service_response = ecs_client.describe_services(
             cluster=cluster, services=[service_name_to_check]
@@ -186,7 +185,7 @@ async def get_deployment_status(
         }
 
 
-async def _get_cfn_stack_status(access_key: str, secret_access_key: str, stack_name: str) -> Dict[str, Any]:
+async def _get_cfn_stack_status(credentials: Dict[str, Any], stack_name: str) -> Dict[str, Any]:
     """
     Gets the status of a CloudFormation stack.
 
@@ -196,7 +195,7 @@ async def _get_cfn_stack_status(access_key: str, secret_access_key: str, stack_n
     Returns:
         Dictionary containing stack status information
     """
-    cloudformation = await get_aws_client(access_key, secret_access_key, "cloudformation")
+    cloudformation = await get_aws_client(credentials, "cloudformation")
 
     try:
         # Use boto3 to describe the stack
@@ -275,7 +274,7 @@ def _get_stack_names_to_try(app_name: str, stack_name: Optional[str] = None) -> 
 
 
 async def _find_cloudformation_stack(
-    access_key: str, secret_access_key: str, 
+    credentials: Dict[str, Any], 
     app_name: str, stack_name: Optional[str] = None
 ) -> Tuple[Optional[str], Dict[str, Any]]:
     """
@@ -293,7 +292,7 @@ async def _find_cloudformation_stack(
 
     # Try each stack name until we find one that exists
     for name in stack_names_to_try:
-        current_status = await _get_cfn_stack_status(access_key, secret_access_key, name)
+        current_status = await _get_cfn_stack_status(credentials, name)
         if current_status.get("status") != "NOT_FOUND":
             logger.info(f"Found stack with name: {name}")
             return name, current_status
@@ -303,7 +302,7 @@ async def _find_cloudformation_stack(
     return None, {"status": "NOT_FOUND", "details": "No stack found with any naming pattern"}
 
 
-async def _get_alb_url(access_key: str, secret_access_key: str, app_name: str, known_stack_name: Optional[str] = None) -> Optional[str]:
+async def _get_alb_url(credentials: Dict[str, Any], app_name: str, known_stack_name: Optional[str] = None) -> Optional[str]:
     """
     Gets the ALB URL from CloudFormation outputs.
 
@@ -314,7 +313,7 @@ async def _get_alb_url(access_key: str, secret_access_key: str, app_name: str, k
     Returns:
         The ALB URL or None if not found
     """
-    cloudformation = await get_aws_client(access_key, secret_access_key, "cloudformation")
+    cloudformation = await get_aws_client(credentials, "cloudformation")
 
     # Get stack names to try using the helper function
     stack_names_to_try = _get_stack_names_to_try(app_name, known_stack_name)

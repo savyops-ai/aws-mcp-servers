@@ -31,8 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 async def fetch_task_logs(
-    access_key: str, 
-    secret_access_key: str,
+    credentials: Dict[str, Any],
     app_name: str,
     cluster_name: str,
     task_id: Optional[str] = None,
@@ -84,7 +83,7 @@ async def fetch_task_logs(
         }
 
         # Initialize CloudWatch Logs client using get_aws_client
-        logs = await get_aws_client(access_key, secret_access_key, "logs")
+        logs = await get_aws_client(credentials, "logs")
 
         # Determine log group name pattern
         # Usually follows the format /ecs/{cluster_name}/{task_or_service_name}

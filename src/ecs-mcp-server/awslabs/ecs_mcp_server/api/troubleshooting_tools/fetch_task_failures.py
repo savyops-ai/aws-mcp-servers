@@ -34,8 +34,7 @@ get_aws_client = aws_get_aws_client
 
 
 async def fetch_task_failures(
-    access_key: str, 
-    secret_access_key: str,
+    credentials: Dict[str, Any],
     app_name: str,
     cluster_name: str,
     time_window: int = 3600,
@@ -79,7 +78,7 @@ async def fetch_task_failures(
         }
 
         # Initialize ECS client using get_aws_client
-        ecs = await aws_get_aws_client(access_key, secret_access_key, "ecs")
+        ecs = await aws_get_aws_client(credentials, "ecs")
 
         # Check if cluster exists
         try:

@@ -30,7 +30,7 @@ from awslabs.ecs_mcp_server.utils.aws import get_aws_client
 logger = logging.getLogger(__name__)
 
 
-async def fetch_cloudformation_status(access_key: str, secret_access_key: str, stack_id: str) -> Dict[str, Any]:
+async def fetch_cloudformation_status(credentials: Dict[str, Any], stack_id: str) -> Dict[str, Any]:
     """
     Infrastructure-level diagnostics for CloudFormation stacks.
 
@@ -55,7 +55,7 @@ async def fetch_cloudformation_status(access_key: str, secret_access_key: str, s
         }
 
         # Initialize CloudFormation client using get_aws_client
-        cloudformation = await get_aws_client(access_key, secret_access_key, "cloudformation")
+        cloudformation = await get_aws_client(credentials, "cloudformation")
 
         # Check if stack exists
         try:

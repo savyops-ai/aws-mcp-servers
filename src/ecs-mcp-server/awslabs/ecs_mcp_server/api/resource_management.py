@@ -126,7 +126,7 @@ async def ecs_resource_management(
 # ============ CLUSTER OPERATIONS ============
 
 
-async def list_clusters(access_key: str, secret_access_key: str, filters: Dict[str, Any]) -> Dict[str, Any]:
+async def list_clusters(credentials: Dict[str, Any], filters: Dict[str, Any]) -> Dict[str, Any]:
     """
     Lists all ECS clusters with optional filtering.
 
@@ -139,7 +139,7 @@ async def list_clusters(access_key: str, secret_access_key: str, filters: Dict[s
     logger.info(f"Listing ECS clusters with filters: {filters}")
 
     try:
-        ecs_client = await get_aws_client(access_key, secret_access_key, "ecs")
+        ecs_client = await get_aws_client(credentials, "ecs")
         response = ecs_client.list_clusters()
         cluster_arns = response.get("clusterArns", [])
 
@@ -163,7 +163,7 @@ async def list_clusters(access_key: str, secret_access_key: str, filters: Dict[s
         return {"error": str(e), "clusters": [], "count": 0}
 
 
-async def describe_cluster(access_key: str, secret_access_key: str, cluster: str, filters: Dict[str, Any]) -> Dict[str, Any]:
+async def describe_cluster(credentials: Dict[str, Any], cluster: str, filters: Dict[str, Any]) -> Dict[str, Any]:
     """
     Gets detailed information about a specific ECS cluster.
 
@@ -177,7 +177,7 @@ async def describe_cluster(access_key: str, secret_access_key: str, cluster: str
     logger.info(f"Describing ECS cluster: {cluster}")
 
     try:
-        ecs_client = await get_aws_client(access_key, secret_access_key, "ecs")
+        ecs_client = await get_aws_client(credentials, "ecs")
         response = ecs_client.describe_clusters(
             clusters=[cluster], include=["ATTACHMENTS", "SETTINGS", "STATISTICS", "TAGS"]
         )
@@ -216,7 +216,7 @@ async def describe_cluster(access_key: str, secret_access_key: str, cluster: str
 # ============ SERVICE OPERATIONS ============
 
 
-async def list_services(access_key: str, secret_access_key: str, filters: Dict[str, Any]) -> Dict[str, Any]:
+async def list_services(credentials: Dict[str, Any], filters: Dict[str, Any]) -> Dict[str, Any]:
     """
     Lists ECS services with optional filtering by cluster.
 
@@ -230,7 +230,7 @@ async def list_services(access_key: str, secret_access_key: str, filters: Dict[s
     logger.info(f"Listing ECS services with filters: {filters}")
 
     try:
-        ecs_client = await get_aws_client(access_key, secret_access_key, "ecs")
+        ecs_client = await get_aws_client(credentials, "ecs")
         cluster_name = filters.get("cluster")
 
         services = []
@@ -271,7 +271,7 @@ async def list_services(access_key: str, secret_access_key: str, filters: Dict[s
         return {"error": str(e), "services": [], "count": 0}
 
 
-async def describe_service(access_key: str, secret_access_key: str, service: str, filters: Dict[str, Any]) -> Dict[str, Any]:
+async def describe_service(credentials: Dict[str, Any], service: str, filters: Dict[str, Any]) -> Dict[str, Any]:
     """
     Gets detailed information about a specific ECS service.
 
@@ -287,7 +287,7 @@ async def describe_service(access_key: str, secret_access_key: str, service: str
 
     try:
         cluster = filters.get("cluster")
-        ecs_client = await get_aws_client(access_key, secret_access_key, "ecs")
+        ecs_client = await get_aws_client(credentials, "ecs")
 
         response = ecs_client.describe_services(
             cluster=cluster, services=[service], include=["TAGS"]
@@ -325,7 +325,7 @@ async def describe_service(access_key: str, secret_access_key: str, service: str
 # ============ TASK OPERATIONS ============
 
 
-async def list_tasks(access_key: str, secret_access_key: str, filters: Dict[str, Any]) -> Dict[str, Any]:
+async def list_tasks(credentials: Dict[str, Any], filters: Dict[str, Any]) -> Dict[str, Any]:
     """
     Lists ECS tasks with optional filtering.
 
@@ -341,7 +341,7 @@ async def list_tasks(access_key: str, secret_access_key: str, filters: Dict[str,
     logger.info(f"Listing ECS tasks with filters: {filters}")
 
     try:
-        ecs_client = await get_aws_client(access_key, secret_access_key, "ecs")
+        ecs_client = await get_aws_client(credentials, "ecs")
         cluster_name = filters.get("cluster")
         service_name = filters.get("service")
         status = filters.get("status", "").upper()  # Default to all
@@ -399,7 +399,7 @@ async def list_tasks(access_key: str, secret_access_key: str, filters: Dict[str,
         return {"error": str(e), "tasks": [], "count": 0}
 
 
-async def describe_task(access_key: str, secret_access_key: str, task: str, filters: Dict[str, Any]) -> Dict[str, Any]:
+async def describe_task(credentials: Dict[str, Any], task: str, filters: Dict[str, Any]) -> Dict[str, Any]:
     """
     Gets detailed information about a specific ECS task.
 
@@ -415,7 +415,7 @@ async def describe_task(access_key: str, secret_access_key: str, task: str, filt
 
     try:
         cluster = filters.get("cluster")
-        ecs_client = await get_aws_client(access_key, secret_access_key, "ecs")
+        ecs_client = await get_aws_client(credentials, "ecs")
 
         response = ecs_client.describe_tasks(cluster=cluster, tasks=[task], include=["TAGS"])
 
@@ -463,7 +463,7 @@ async def describe_task(access_key: str, secret_access_key: str, task: str, filt
 # ============ TASK DEFINITION OPERATIONS ============
 
 
-async def list_task_definitions(access_key: str, secret_access_key: str, filters: Dict[str, Any]) -> Dict[str, Any]:
+async def list_task_definitions(credentials: Dict[str, Any], filters: Dict[str, Any]) -> Dict[str, Any]:
     """
     Lists task definitions with optional filtering.
 
@@ -479,7 +479,7 @@ async def list_task_definitions(access_key: str, secret_access_key: str, filters
     logger.info(f"Listing task definitions with filters: {filters}")
 
     try:
-        ecs_client = await get_aws_client(access_key, secret_access_key, "ecs")
+        ecs_client = await get_aws_client(credentials, "ecs")
 
         params = {}
         if "family" in filters:
@@ -512,7 +512,7 @@ async def list_task_definitions(access_key: str, secret_access_key: str, filters
         return {"error": str(e), "task_definition_arns": [], "count": 0}
 
 
-async def describe_task_definition(access_key: str, secret_access_key: str, task_definition: str) -> Dict[str, Any]:
+async def describe_task_definition(credentials: Dict[str, Any], task_definition: str) -> Dict[str, Any]:
     """
     Gets detailed information about a specific task definition.
 
@@ -525,7 +525,7 @@ async def describe_task_definition(access_key: str, secret_access_key: str, task
     logger.info(f"Describing task definition: {task_definition}")
 
     try:
-        ecs_client = await get_aws_client(access_key, secret_access_key, "ecs")
+        ecs_client = await get_aws_client(credentials, "ecs")
 
         response = ecs_client.describe_task_definition(taskDefinition=task_definition)
 
@@ -573,7 +573,7 @@ async def describe_task_definition(access_key: str, secret_access_key: str, task
 # ============ CONTAINER INSTANCE OPERATIONS ============
 
 
-async def list_container_instances(access_key: str, secret_access_key: str, filters: Dict[str, Any]) -> Dict[str, Any]:
+async def list_container_instances(credentials: Dict[str, Any], filters: Dict[str, Any]) -> Dict[str, Any]:
     """
     Lists container instances with optional filtering.
 
@@ -596,7 +596,7 @@ async def list_container_instances(access_key: str, secret_access_key: str, filt
                 "count": 0,
             }
 
-        ecs_client = await get_aws_client(access_key, secret_access_key, "ecs")
+        ecs_client = await get_aws_client(credentials, "ecs")
 
         params = {"cluster": cluster}
         if "status" in filters and filters["status"] in ["ACTIVE", "DRAINING"]:
@@ -624,7 +624,7 @@ async def list_container_instances(access_key: str, secret_access_key: str, filt
 
 
 async def describe_container_instance(
-    access_key: str, secret_access_key: str, 
+    credentials: Dict[str, Any], 
     container_instance: str, filters: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
@@ -643,7 +643,7 @@ async def describe_container_instance(
 
     try:
         cluster = filters.get("cluster")
-        ecs_client = await get_aws_client(access_key, secret_access_key, "ecs")
+        ecs_client = await get_aws_client(credentials, "ecs")
 
         response = ecs_client.describe_container_instances(
             cluster=cluster, containerInstances=[container_instance]
@@ -662,7 +662,7 @@ async def describe_container_instance(
         ec2_details = None
 
         if ec2_instance_id:
-            ec2_client = await get_aws_client(access_key, secret_access_key, "ec2")
+            ec2_client = await get_aws_client(credentials, "ec2")
             ec2_response = ec2_client.describe_instances(InstanceIds=[ec2_instance_id])
 
             if ec2_response.get("Reservations") and ec2_response["Reservations"]:
@@ -687,7 +687,7 @@ async def describe_container_instance(
 # ============ CAPACITY PROVIDER OPERATIONS ============
 
 
-async def list_capacity_providers(access_key: str, secret_access_key: str, filters: Dict[str, Any]) -> Dict[str, Any]:
+async def list_capacity_providers(credentials: Dict[str, Any], filters: Dict[str, Any]) -> Dict[str, Any]:
     """
     Lists capacity providers.
 
@@ -700,7 +700,7 @@ async def list_capacity_providers(access_key: str, secret_access_key: str, filte
     logger.info("Listing capacity providers")
 
     try:
-        ecs_client = await get_aws_client(access_key, secret_access_key, "ecs")
+        ecs_client = await get_aws_client(credentials, "ecs")
 
         response = ecs_client.describe_capacity_providers()
         capacity_providers = response.get("capacityProviders", [])
@@ -715,7 +715,7 @@ async def list_capacity_providers(access_key: str, secret_access_key: str, filte
         return {"error": str(e), "capacity_providers": [], "count": 0}
 
 
-async def describe_capacity_provider(access_key: str, secret_access_key: str, capacity_provider: str) -> Dict[str, Any]:
+async def describe_capacity_provider(credentials: Dict[str, Any], capacity_provider: str) -> Dict[str, Any]:
     """
     Gets detailed information about a specific capacity provider.
 
@@ -728,7 +728,7 @@ async def describe_capacity_provider(access_key: str, secret_access_key: str, ca
     logger.info(f"Describing capacity provider: {capacity_provider}")
 
     try:
-        ecs_client = await get_aws_client(access_key, secret_access_key, "ecs")
+        ecs_client = await get_aws_client(credentials, "ecs")
 
         response = ecs_client.describe_capacity_providers(capacityProviders=[capacity_provider])
 

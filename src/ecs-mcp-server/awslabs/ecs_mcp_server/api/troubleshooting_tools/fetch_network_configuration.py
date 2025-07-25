@@ -52,7 +52,7 @@ async def handle_aws_api_call(func, error_value=None, *args, **kwargs):
         return error_value
 
 
-async def fetch_network_configuration(access_key: str, secret_access_key: str,
+async def fetch_network_configuration(credentials: Dict[str, Any],
     app_name: str, vpc_id: Optional[str] = None, cluster_name: Optional[str] = None
 ) -> Dict[str, Any]:
     """
@@ -74,21 +74,21 @@ async def fetch_network_configuration(access_key: str, secret_access_key: str,
         Raw network configuration data for LLM analysis
     """
     try:
-        return await get_network_data(access_key, secret_access_key, app_name, vpc_id, cluster_name)
+        return await get_network_data(credentials, app_name, vpc_id, cluster_name)
     except Exception as e:
         logger.exception(f"Error in fetch_network_configuration: {e}")
         return {"status": "error", "error": f"Internal error: {str(e)}"}
 
 
-async def get_network_data(access_key: str, secret_access_key: str,
+async def get_network_data(credentials: Dict[str, Any],
     app_name: str, vpc_id: Optional[str] = None, cluster_name: Optional[str] = None
 ) -> Dict[str, Any]:
     """Collect all relevant networking data with minimal processing."""
     try:
         # Initialize clients
-        ec2 = await get_aws_client(access_key, secret_access_key, "ec2")
-        ecs = await get_aws_client(access_key, secret_access_key, "ecs")
-        elbv2 = await get_aws_client(access_key, secret_access_key, "elbv2")
+        ec2 = await get_aws_client(credentials, "ec2")
+        ecs = await get_aws_client(credentials, "ecs")
+        elbv2 = await get_aws_client(credentials, "elbv2")
 
         # Identify relevant clusters
         clusters = []
@@ -111,15 +111,15 @@ async def get_network_data(access_key: str, secret_access_key: str,
         vpc_ids = [vpc_id] if vpc_id else []
         if not vpc_ids:
             # VPC discovery from ECS tasks
-            discovered_vpcs = await discover_vpcs_from_clusters(access_key, secret_access_key, clusters)
+            discovered_vpcs = await discover_vpcs_from_clusters(credentials, clusters)
             vpc_ids.extend(discovered_vpcs)
 
             # VPC discovery from load balancers
-            lb_vpcs = await discover_vpcs_from_loadbalancers(access_key, secret_access_key, app_name)
+            lb_vpcs = await discover_vpcs_from_loadbalancers(credentials, app_name)
             vpc_ids.extend(lb_vpcs)
 
             # VPC discovery from CloudFormation tags
-            cf_vpcs = await discover_vpcs_from_cloudformation(access_key, secret_access_key, app_name)
+            cf_vpcs = await discover_vpcs_from_cloudformation(credentials, app_name)
             vpc_ids.extend(cf_vpcs)
 
             # Direct VPC search by tags
@@ -190,13 +190,13 @@ async def get_network_data(access_key: str, secret_access_key: str,
         return {"status": "error", "error": str(e)}
 
 
-async def discover_vpcs_from_clusters(access_key: str, secret_access_key: str, clusters: List[str]) -> List[str]:
+async def discover_vpcs_from_clusters(credentials: Dict[str, Any], clusters: List[str]) -> List[str]:
     """Discover VPC IDs associated with ECS clusters."""
     vpc_ids = []
 
     try:
-        ecs = await get_aws_client(access_key, secret_access_key, "ecs")
-        ec2 = await get_aws_client(access_key, secret_access_key, "ec2")
+        ecs = await get_aws_client(credentials, "ecs")
+        ec2 = await get_aws_client(credentials, "ec2")
 
         for cluster in clusters:
             # List tasks in the cluster
@@ -257,12 +257,12 @@ async def discover_vpcs_from_clusters(access_key: str, secret_access_key: str, c
     return vpc_ids
 
 
-async def discover_vpcs_from_loadbalancers(access_key: str, secret_access_key: str, app_name: str) -> List[str]:
+async def discover_vpcs_from_loadbalancers(credentials: Dict[str, Any], app_name: str) -> List[str]:
     """Discover VPC IDs associated with load balancers related to the application."""
     vpc_ids = []
 
     try:
-        elbv2 = await get_aws_client(access_key, secret_access_key, "elbv2")
+        elbv2 = await get_aws_client(credentials, "elbv2")
 
         # Describe load balancers
         lb_response = await handle_aws_api_call(
@@ -313,12 +313,12 @@ async def discover_vpcs_from_loadbalancers(access_key: str, secret_access_key: s
     return vpc_ids
 
 
-async def discover_vpcs_from_cloudformation(access_key: str, secret_access_key: str, app_name: str) -> List[str]:
+async def discover_vpcs_from_cloudformation(credentials: Dict[str, Any], app_name: str) -> List[str]:
     """Discover VPC IDs from CloudFormation stacks related to the application."""
     vpc_ids = []
 
     try:
-        cfn = await get_aws_client(access_key, secret_access_key, "cloudformation")
+        cfn = await get_aws_client(credentials, "cloudformation")
 
         # List CloudFormation stacks
         stacks = []

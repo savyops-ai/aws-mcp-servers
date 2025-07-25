@@ -23,6 +23,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from awslabs.ecs_mcp_server.api.resource_management import ecs_resource_management
+from awslabs.ecs_mcp_server.utils.schemas import AwsCredentials
 
 
 def register_module(mcp: FastMCP) -> None:
@@ -30,8 +31,7 @@ def register_module(mcp: FastMCP) -> None:
 
     @mcp.tool(name="ecs_resource_management", annotations=None)
     async def mcp_ecs_resource_management(
-        access_key: str,
-        secret_access_key: str,
+        credentials: AwsCredentials,
         action: str = Field(
             ...,
             description="Action to perform (list, describe)",
@@ -75,7 +75,7 @@ def register_module(mcp: FastMCP) -> None:
         Returns:
             Dictionary containing the requested ECS resources
         """
-        return await ecs_resource_management(access_key, secret_access_key, action, resource_type, identifier, filters)
+        return await ecs_resource_management(credentials, action, resource_type, identifier, filters)
 
     # Prompt patterns for resource management
     @mcp.prompt("list ecs resources")

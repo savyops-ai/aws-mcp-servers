@@ -27,8 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 async def delete_infrastructure(
-    access_key: str, 
-    secret_access_key: str,
+    credentials: Dict[str, Any],
     app_name: str,
     ecr_template_path: str,
     ecs_template_path: str,
@@ -85,7 +84,7 @@ async def delete_infrastructure(
         }
 
     # Get CloudFormation client
-    cloudformation = await get_aws_client(access_key, secret_access_key, "cloudformation")
+    cloudformation = await get_aws_client(credentials, "cloudformation")
 
     # List all stacks to find matching ones
     try:

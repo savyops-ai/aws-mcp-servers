@@ -23,6 +23,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from awslabs.ecs_mcp_server.api.status import get_deployment_status
+from awslabs.ecs_mcp_server.utils.schemas import AwsCredentials
 
 
 def register_module(mcp: FastMCP) -> None:
@@ -30,8 +31,7 @@ def register_module(mcp: FastMCP) -> None:
 
     @mcp.tool(name="get_deployment_status", annotations=None)
     async def mcp_get_deployment_status(
-        access_key: str,
-        secret_access_key: str,
+        credentials: AwsCredentials,
         app_name: str = Field(
             ...,
             description="Name of the application",
@@ -88,4 +88,4 @@ def register_module(mcp: FastMCP) -> None:
         Returns:
             Dictionary containing deployment status and ALB URL
         """
-        return await get_deployment_status(access_key, secret_access_key, app_name, cluster_name, stack_name, service_name)
+        return await get_deployment_status(credentials, app_name, cluster_name, stack_name, service_name)

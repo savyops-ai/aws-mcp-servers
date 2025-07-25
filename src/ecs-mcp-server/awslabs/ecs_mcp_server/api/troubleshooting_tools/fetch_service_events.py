@@ -117,14 +117,14 @@ async def _check_port_mismatch(
         return {"type": "target_group_error", "error": str(error)}
 
 
-async def _analyze_load_balancer_issues(access_key: str, secret_access_key: str, service: Dict[str, Any]) -> List[Dict[str, Any]]:
+async def _analyze_load_balancer_issues(credentials, service: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Analyze load balancer configuration for common issues."""
     load_balancers = service.get("loadBalancers", [])
     if not load_balancers:
         return []
 
     load_balancer_issues = []
-    elb = await get_aws_client(access_key, secret_access_key, "elbv2")
+    elb = await get_aws_client(credentials, "elbv2")
 
     for lb in load_balancers:
         lb_issues = []
@@ -150,8 +150,7 @@ async def _analyze_load_balancer_issues(access_key: str, secret_access_key: str,
 
 
 async def fetch_service_events(
-    access_key: str, 
-    secret_access_key: str,
+    credentials: Dict[str, Any],
     app_name: str,
     cluster_name: str,
     service_name: str,
@@ -198,7 +197,7 @@ async def fetch_service_events(
         }
 
         # Initialize ECS client using get_aws_client
-        ecs = await get_aws_client(access_key, secret_access_key, "ecs")
+        ecs = await get_aws_client(credentials, "ecs")
 
         # Check if service exists
         try:
@@ -273,7 +272,7 @@ async def fetch_service_events(
                     )
 
                 # Check for load balancer issues
-                lb_issues = await _analyze_load_balancer_issues(access_key, secret_access_key, service)
+                lb_issues = await _analyze_load_balancer_issues(credentials, service)
                 if lb_issues:
                     issues.extend(lb_issues)
 

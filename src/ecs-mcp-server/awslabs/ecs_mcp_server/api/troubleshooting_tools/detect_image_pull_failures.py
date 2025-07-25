@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 # Re-export these functions for testing purposes
-async def get_task_definitions(access_key: str, secret_access_key: str, app_name: str) -> List[Dict[str, Any]]:
+async def get_task_definitions(credentials: Dict[str, Any], app_name: str) -> List[Dict[str, Any]]:
     """
     Find task definitions related to the application.
 
@@ -49,10 +49,10 @@ async def get_task_definitions(access_key: str, secret_access_key: str, app_name
     List[Dict[str, Any]]
         List of task definition dictionaries with full details
     """
-    return await _get_task_definitions(access_key, secret_access_key, app_name)
+    return await _get_task_definitions(credentials, app_name)
 
 
-async def validate_container_images(access_key: str, secret_access_key: str, task_definitions: List[Dict]) -> List[Dict]:
+async def validate_container_images(credentials: Dict[str, Any], task_definitions: List[Dict]) -> List[Dict]:
     """
     Validate container images in task definitions.
 
@@ -68,10 +68,10 @@ async def validate_container_images(access_key: str, secret_access_key: str, tas
     List[Dict]
         List of validation results for each container image
     """
-    return await _validate_container_images(access_key, secret_access_key, task_definitions)
+    return await _validate_container_images(credentials, task_definitions)
 
 
-async def detect_image_pull_failures(access_key: str, secret_access_key: str, app_name: str) -> Dict[str, Any]:
+async def detect_image_pull_failures(credentials: Dict[str, Any], app_name: str) -> Dict[str, Any]:
     """
     Specialized tool for detecting image pull failures.
 
@@ -95,7 +95,7 @@ async def detect_image_pull_failures(access_key: str, secret_access_key: str, ap
 
         # Find related task definitions
         try:
-            task_definitions = await get_task_definitions(access_key, secret_access_key, app_name)
+            task_definitions = await get_task_definitions(credentials, app_name)
         except Exception as e:
             logger.exception("Error getting task definitions: %s", str(e))
             return {
@@ -112,7 +112,7 @@ async def detect_image_pull_failures(access_key: str, secret_access_key: str, ap
 
         # Check container images
         try:
-            image_results = await validate_container_images(access_key, secret_access_key, task_definitions)
+            image_results = await validate_container_images(credentials, task_definitions)
         except Exception as e:
             logger.exception("Error validating container images: %s", str(e))
             return {

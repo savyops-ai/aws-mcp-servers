@@ -21,14 +21,14 @@ import logging
 import os
 import subprocess
 import time
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from awslabs.ecs_mcp_server.utils.aws import get_aws_account_id, get_aws_client
 
 logger = logging.getLogger(__name__)
 
 
-async def get_ecr_login_password(access_key: str, secret_access_key: str, role_arn: Optional[str] = None) -> str:
+async def get_ecr_login_password(credentials: Dict[str, Any], role_arn: Optional[str] = None) -> str:
     """
     Gets the ECR login password using the AWS SDK.
 
@@ -43,9 +43,9 @@ async def get_ecr_login_password(access_key: str, secret_access_key: str, role_a
         if role_arn:
             from awslabs.ecs_mcp_server.utils.aws import get_aws_client_with_role
 
-            ecr_client = await get_aws_client_with_role(access_key, secret_access_key, "ecr", role_arn)
+            ecr_client = await get_aws_client_with_role(credentials, "ecr", role_arn)
         else:
-            ecr_client = await get_aws_client(access_key, secret_access_key, "ecr")
+            ecr_client = await get_aws_client(credentials, "ecr")
 
         # Get authorization token
         try:
@@ -68,7 +68,7 @@ async def get_ecr_login_password(access_key: str, secret_access_key: str, role_a
         raise
 
 
-async def build_and_push_image(access_key: str, secret_access_key: str,
+async def build_and_push_image(credentials: Dict[str, Any],
     app_path: str, repository_uri: str, tag: Optional[str] = None, role_arn: Optional[str] = None
 ) -> str:
     """
@@ -96,7 +96,7 @@ async def build_and_push_image(access_key: str, secret_access_key: str,
 
     try:
         # Get ECR login password and account info
-        account_id = await get_aws_account_id(access_key, secret_access_key)
+        account_id = await get_aws_account_id(credentials)
         region = os.environ.get("AWS_REGION", "us-east-1")
         profile = os.environ.get("AWS_PROFILE", "default")
 
@@ -117,7 +117,7 @@ async def build_and_push_image(access_key: str, secret_access_key: str,
         # Get ECR password using our utility function that supports role-based auth
         try:
             logger.info("Getting ECR login password...")
-            ecr_password = await get_ecr_login_password(access_key, secret_access_key, role_arn)
+            ecr_password = await get_ecr_login_password(credentials, role_arn)
             logger.info("Successfully obtained ECR login password")
         except Exception as e:
             logger.error(f"Failed to get ECR login password: {str(e)}")

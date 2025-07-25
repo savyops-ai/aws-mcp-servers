@@ -104,8 +104,7 @@ def prepare_template_files(app_name: str, app_path: str) -> Dict[str, str]:
 
 
 async def create_infrastructure(
-    access_key: str,
-    secret_access_key: str,
+    credentials: Dict[str, Any],
     app_name: str,
     app_path: str,
     force_deploy: bool = False,
@@ -217,7 +216,7 @@ async def create_infrastructure(
             else:
                 raise
 
-        ecr_result = await create_ecr_infrastructure(access_key=access_key, secret_access_key=secret_access_key,
+        ecr_result = await create_ecr_infrastructure(credentials=credentials,
             app_name=app_name, template_content=template_files["ecr_template_content"]
         )
 
@@ -246,7 +245,7 @@ async def create_infrastructure(
         # For steps 2 and 3, we need to get the ECR info from a previous run
         try:
             # Get CloudFormation client
-            cloudformation = await get_aws_client(access_key, secret_access_key, "cloudformation")
+            cloudformation = await get_aws_client(credentials, "cloudformation")
 
             # Get ECR stack info
             stack_name = f"{app_name}-ecr-infrastructure"
@@ -307,7 +306,7 @@ async def create_infrastructure(
 
             logger.info(f"Using ECR push/pull role ARN: {ecr_role_arn}")
 
-            image_tag = await build_and_push_image(access_key=access_key, secret_access_key=secret_access_key,
+            image_tag = await build_and_push_image(credentials=credentials,
                 app_path=app_path, repository_uri=ecr_repo_uri, role_arn=ecr_role_arn
             )
             logger.info(f"Image successfully built and pushed with tag: {image_tag}")
@@ -354,7 +353,7 @@ async def create_infrastructure(
         ecr_role_arn = ecr_result["resources"]["ecr_push_pull_role_arn"]
 
         # Get the latest image tag from ECR
-        image_tag = await get_latest_image_tag(access_key, secret_access_key, app_name, ecr_role_arn)
+        image_tag = await get_latest_image_tag(credentials, app_name, ecr_role_arn)
         logger.info(f"Using latest image tag from ECR: {image_tag}")
 
     # Step 3: Deploy ECS infrastructure
@@ -371,8 +370,7 @@ async def create_infrastructure(
                     raise
 
             ecs_result = await create_ecs_infrastructure(
-                access_key=access_key,
-                secret_access_key=secret_access_key,
+                credentials=credentials,
                 app_name=app_name,
                 image_uri=ecr_repo_uri,
                 image_tag=image_tag,
@@ -436,7 +434,7 @@ async def create_infrastructure(
     }
 
 
-async def get_latest_image_tag(access_key: str, secret_access_key: str, app_name: str, role_arn: str) -> str:
+async def get_latest_image_tag(credentials: Dict[str, Any], app_name: str, role_arn: str) -> str:
     """
     Gets the latest image tag from ECR for the given repository.
 
@@ -454,7 +452,7 @@ async def get_latest_image_tag(access_key: str, secret_access_key: str, app_name
 
     try:
         # Get ECR client with the provided role
-        ecr = await get_aws_client_with_role(access_key, secret_access_key, "ecr", role_arn)
+        ecr = await get_aws_client_with_role(credentials, "ecr", role_arn)
 
         # List images in the repository
         response = ecr.list_images(repositoryName=f"{app_name}-repo")
@@ -491,8 +489,7 @@ async def get_latest_image_tag(access_key: str, secret_access_key: str, app_name
 
 
 async def create_ecr_infrastructure(
-    access_key: str,
-    secret_access_key: str,
+    credentials: Dict[str, Any],
     app_name: str,
     template_content: str,
 ) -> Dict[str, Any]:
@@ -509,10 +506,10 @@ async def create_ecr_infrastructure(
     logger.info(f"Creating ECR infrastructure for {app_name}")
 
     # Get AWS account ID (not used directly but keeping the call for consistency)
-    await get_aws_account_id(access_key, secret_access_key)
+    await get_aws_account_id(credentials)
 
     # Deploy the CloudFormation stack
-    cloudformation = await get_aws_client(access_key, secret_access_key, "cloudformation")
+    cloudformation = await get_aws_client(credentials, "cloudformation")
     stack_name = f"{app_name}-ecr-infrastructure"
 
     # Check if stack already exists
@@ -592,8 +589,7 @@ async def create_ecr_infrastructure(
 
 
 async def create_ecs_infrastructure(
-    access_key: str,
-    secret_access_key: str,
+    credentials: Dict[str, Any],
     app_name: str,
     template_content: str,
     image_uri: Optional[str] = None,
@@ -643,7 +639,7 @@ async def create_ecs_infrastructure(
 
     # Get VPC and subnet information if not provided
     if not vpc_id or not subnet_ids:
-        vpc_info = await get_default_vpc_and_subnets(access_key, secret_access_key)
+        vpc_info = await get_default_vpc_and_subnets(credentials)
         vpc_id = vpc_id or vpc_info["vpc_id"]
         subnet_ids = subnet_ids or vpc_info["subnet_ids"]
 
@@ -653,12 +649,12 @@ async def create_ecs_infrastructure(
 
         # Ensure vpc_id is not None before passing to get_route_tables_for_vpc
         if vpc_id:
-            route_table_ids = await get_route_tables_for_vpc(access_key, secret_access_key, vpc_id)
+            route_table_ids = await get_route_tables_for_vpc(credentials, vpc_id)
         else:
             route_table_ids = []
 
     # Deploy the CloudFormation stack
-    cloudformation = await get_aws_client(access_key, secret_access_key, "cloudformation")
+    cloudformation = await get_aws_client(credentials, "cloudformation")
     stack_name = f"{app_name}-ecs-infrastructure"
 
     # Check if stack already exists

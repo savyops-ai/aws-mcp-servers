@@ -58,10 +58,10 @@ async def handle_aws_api_call(func, error_value=None, *args, **kwargs):
         return error_value
 
 
-async def find_clusters(access_key: str, secret_access_key: str, app_name: str) -> List[str]:
+async def find_clusters(credentials: Dict[str, Any], app_name: str) -> List[str]:
     """Find ECS clusters related to the application."""
     clusters = []
-    ecs = await get_aws_client(access_key, secret_access_key, "ecs")
+    ecs = await get_aws_client(credentials, "ecs")
 
     cluster_list = await handle_aws_api_call(ecs.list_clusters, {"clusterArns": []})
     if not cluster_list or "clusterArns" not in cluster_list:
@@ -75,10 +75,10 @@ async def find_clusters(access_key: str, secret_access_key: str, app_name: str) 
     return clusters
 
 
-async def find_services(access_key: str, secret_access_key: str, app_name: str, cluster_name: str) -> List[str]:
+async def find_services(credentials: Dict[str, Any], app_name: str, cluster_name: str) -> List[str]:
     """Find ECS services in a specific cluster related to the application."""
     services = []
-    ecs = await get_aws_client(access_key, secret_access_key, "ecs")
+    ecs = await get_aws_client(credentials, "ecs")
 
     try:
         service_list = ecs.list_services(cluster=cluster_name)
@@ -99,10 +99,10 @@ async def find_services(access_key: str, secret_access_key: str, app_name: str, 
     return services
 
 
-async def find_load_balancers(access_key: str, secret_access_key: str, app_name: str) -> List[Dict[str, Any]]:
+async def find_load_balancers(credentials: Dict[str, Any], app_name: str) -> List[Dict[str, Any]]:
     """Find load balancers related to the application."""
     load_balancers = []
-    elbv2 = await get_aws_client(access_key, secret_access_key, "elbv2")
+    elbv2 = await get_aws_client(credentials, "elbv2")
 
     lb_list = await handle_aws_api_call(elbv2.describe_load_balancers, {"LoadBalancers": []})
 
@@ -116,7 +116,7 @@ async def find_load_balancers(access_key: str, secret_access_key: str, app_name:
     return load_balancers
 
 
-async def get_task_definitions(access_key: str, secret_access_key: str, app_name: str) -> List[Dict[str, Any]]:
+async def get_task_definitions(credentials: Dict[str, Any], app_name: str) -> List[Dict[str, Any]]:
     """
     Find task definitions related to the application using simple name matching.
 
@@ -134,7 +134,7 @@ async def get_task_definitions(access_key: str, secret_access_key: str, app_name
         List of task definition dictionaries with full details
     """
     task_definitions = []
-    ecs = await get_aws_client(access_key, secret_access_key, "ecs")
+    ecs = await get_aws_client(credentials, "ecs")
     app_name_lower = app_name.lower()
 
     try:
@@ -176,7 +176,7 @@ async def get_task_definitions(access_key: str, secret_access_key: str, app_name
     return task_definitions
 
 
-async def discover_resources(access_key: str, secret_access_key: str, app_name: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+async def discover_resources(credentials: Dict[str, Any], app_name: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """
     Main resource discovery coordinator function.
 
@@ -196,19 +196,19 @@ async def discover_resources(access_key: str, secret_access_key: str, app_name: 
         - List of complete task definition objects
     """
     resources = {
-        "clusters": await find_clusters(access_key, secret_access_key, app_name),
+        "clusters": await find_clusters(credentials, app_name),
         "services": [],
         "task_definitions": [],
-        "load_balancers": await find_load_balancers(access_key, secret_access_key, app_name),
+        "load_balancers": await find_load_balancers(credentials, app_name),
     }
 
     # Find services for each discovered cluster and default cluster
     for cluster in resources["clusters"] + ["default"]:
-        services = await find_services(access_key, secret_access_key, app_name, cluster)
+        services = await find_services(credentials, app_name, cluster)
         resources["services"].extend(services)
 
     # Get task definitions
-    task_defs = await get_task_definitions(access_key, secret_access_key, app_name)
+    task_defs = await get_task_definitions(credentials, app_name)
 
     # For task definitions, extract and format the resource ID
     for task_def in task_defs:
@@ -274,7 +274,7 @@ def parse_ecr_image_uri(image_uri: str) -> Tuple[str, str]:
         return "", ""
 
 
-async def validate_image(access_key: str, secret_access_key: str, image_uri: str) -> Dict[str, Any]:
+async def validate_image(credentials: Dict[str, Any], image_uri: str) -> Dict[str, Any]:
     """
     Validate if a container image exists and is accessible.
 
@@ -297,7 +297,7 @@ async def validate_image(access_key: str, secret_access_key: str, image_uri: str
     if is_ecr_image(image_uri):
         # ECR image logic
         result["repository_type"] = "ecr"
-        ecr = await get_aws_client(access_key, secret_access_key, "ecr")
+        ecr = await get_aws_client(credentials, "ecr")
 
         # Parse repository name and tag
         repo_name, tag = parse_ecr_image_uri(image_uri)
@@ -335,7 +335,7 @@ async def validate_image(access_key: str, secret_access_key: str, image_uri: str
     return result
 
 
-async def validate_container_images(access_key: str, secret_access_key: str, task_definitions: List[Dict]) -> List[Dict]:
+async def validate_container_images(credentials: Dict[str, Any], task_definitions: List[Dict]) -> List[Dict]:
     """Validate container images in task definitions."""
     results = []
 
@@ -344,7 +344,7 @@ async def validate_container_images(access_key: str, secret_access_key: str, tas
             image = container.get("image", "")
 
             # Use the unified validate_image function
-            result = await validate_image(access_key, secret_access_key, image)
+            result = await validate_image(credentials, image)
 
             # Add task and container context
             result.update(
@@ -359,9 +359,9 @@ async def validate_container_images(access_key: str, secret_access_key: str, tas
     return results
 
 
-async def get_stack_status(access_key: str, secret_access_key: str, app_name: str) -> str:
+async def get_stack_status(credentials: Dict[str, Any], app_name: str) -> str:
     """Get CloudFormation stack status for the application."""
-    cloudformation = await get_aws_client(access_key, secret_access_key, "cloudformation")
+    cloudformation = await get_aws_client(credentials, "cloudformation")
     try:
         cf_response = cloudformation.describe_stacks(StackName=app_name)
         if cf_response["Stacks"]:
@@ -421,7 +421,7 @@ def create_assessment(app_name: str, stack_status: str, resources: Dict) -> str:
     return assessment
 
 
-async def find_related_task_definitions(access_key: str, secret_access_key: str, app_name: str) -> List[Dict[str, Any]]:
+async def find_related_task_definitions(credentials: Dict[str, Any], app_name: str) -> List[Dict[str, Any]]:
     """
     Find task definitions related to the application.
 
@@ -437,15 +437,15 @@ async def find_related_task_definitions(access_key: str, secret_access_key: str,
     List[Dict[str, Any]]
         List of task definition dictionaries with full details
     """
-    return await get_task_definitions(access_key, secret_access_key, app_name)
+    return await get_task_definitions(credentials, app_name)
 
 
-async def get_cluster_details(access_key: str, secret_access_key: str, cluster_names: List[str]) -> List[Dict[str, Any]]:
+async def get_cluster_details(credentials: Dict[str, Any], cluster_names: List[str]) -> List[Dict[str, Any]]:
     """Get detailed information about ECS clusters."""
     if not cluster_names:
         return []
 
-    ecs = await get_aws_client(access_key, secret_access_key, "ecs")
+    ecs = await get_aws_client(credentials, "ecs")
     clusters_info = await handle_aws_api_call(
         ecs.describe_clusters, {"clusters": [], "failures": []}, clusters=cluster_names
     )
@@ -471,7 +471,7 @@ async def get_cluster_details(access_key: str, secret_access_key: str, cluster_n
     return detailed_clusters
 
 
-async def get_ecs_troubleshooting_guidance(access_key: str, secret_access_key: str,
+async def get_ecs_troubleshooting_guidance(credentials: Dict[str, Any],
     app_name: str, symptoms_description: Optional[str] = None
 ) -> Dict[str, Any]:
     """
@@ -494,17 +494,17 @@ async def get_ecs_troubleshooting_guidance(access_key: str, secret_access_key: s
         response = {"status": "success", "assessment": "", "raw_data": {}}
 
         # 1. Discover resources and collect raw task definitions
-        resources, task_definitions = await discover_resources(access_key, secret_access_key, app_name)
+        resources, task_definitions = await discover_resources(credentials, app_name)
         response["raw_data"]["related_resources"] = resources
         response["raw_data"]["task_definitions"] = task_definitions
 
         # 2. Get detailed cluster information
-        clusters = await get_cluster_details(access_key, secret_access_key, resources["clusters"])
+        clusters = await get_cluster_details(credentials, resources["clusters"])
         response["raw_data"]["clusters"] = clusters
 
         try:
             # 3. Check stack status
-            stack_status = await get_stack_status(access_key, secret_access_key, app_name)
+            stack_status = await get_stack_status(credentials, app_name)
             response["raw_data"]["cloudformation_status"] = stack_status
         except ClientError as e:
             # Handle auth error or other ClientError
@@ -515,7 +515,7 @@ async def get_ecs_troubleshooting_guidance(access_key: str, secret_access_key: s
             return response
 
         # 4. Check container images
-        image_check_results = await validate_container_images(access_key, secret_access_key, task_definitions)
+        image_check_results = await validate_container_images(credentials, task_definitions)
         response["raw_data"]["image_check_results"] = image_check_results
 
         # Store symptoms description as raw input if provided

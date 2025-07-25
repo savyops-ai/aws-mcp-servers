@@ -19,6 +19,7 @@ from awslabs.amazon_rekognition_mcp_server.helpers import (
     get_rekognition_client,
     handle_exceptions,
 )
+from awslabs.amazon_rekognition_mcp_server.models import AwsCredentials
 from loguru import logger
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
@@ -55,7 +56,11 @@ mcp = FastMCP(
 
 @mcp.tool()
 @handle_exceptions
-async def list_collections() -> Dict:
+async def list_collections(
+    creds: AwsCredentials = Field(
+        ..., description="AWS credentials: access_key, secret_access_key and region"
+    )
+) -> Dict:
     """Returns a list of collection IDs in your AWS account.
 
     Collections are containers for persisting faces that you index. You can create multiple
@@ -63,6 +68,9 @@ async def list_collections() -> Dict:
     for different use cases or different sets of users.
 
     This tool handles pagination internally and returns all collections in a single response.
+    
+    Args:
+        creds: AWS credentials model or dict with `access_key`, `secret_access_key` and `region`
 
     Returns:
         A dictionary containing a list of collection IDs and other metadata.
@@ -72,7 +80,7 @@ async def list_collections() -> Dict:
             "CollectionIds": ["my-collection-1", "my-collection-2"]
         }
     """
-    client = get_rekognition_client()
+    client = get_rekognition_client(creds)
     collections = []
     next_token = None
 
@@ -97,6 +105,9 @@ async def list_collections() -> Dict:
 @mcp.tool()
 @handle_exceptions
 async def index_faces(
+    creds: AwsCredentials = Field(
+        ..., description="AWS credentials: access_key, secret_access_key and region"
+    ),
     collection_id: str = Field(description='ID of the collection to add the face to'),
     image_path: str = Field(description='Path to the image file'),
 ) -> Dict:
@@ -117,6 +128,7 @@ async def index_faces(
     - Image ID assigned to the input image
 
     Args:
+        creds: AWS credentials model or dict with `access_key`, `secret_access_key` and `region`
         collection_id: ID of the collection to add the face to. The collection must already exist.
         image_path: Path to the image file containing faces to index.
 
@@ -141,7 +153,7 @@ async def index_faces(
             "UnindexedFaces": []
         }
     """
-    client = get_rekognition_client()
+    client = get_rekognition_client(creds)
     image = get_image_bytes(image_path)
 
     response = client.index_faces(
@@ -161,6 +173,9 @@ async def index_faces(
 @mcp.tool()
 @handle_exceptions
 async def search_faces_by_image(
+    creds: AwsCredentials = Field(
+        ..., description="AWS credentials: access_key, secret_access_key and region"
+    ),
     collection_id: str = Field(description='ID of the collection to search'),
     image_path: str = Field(description='Path to the image file'),
 ) -> Dict:
@@ -178,6 +193,7 @@ async def search_faces_by_image(
     entire face or specific attributes like age or gender.
 
     Args:
+        creds: AWS credentials model or dict with `access_key`, `secret_access_key` and `region`
         collection_id: ID of the collection to search.
         image_path: Path to the image file containing the face to search for.
 
@@ -204,7 +220,7 @@ async def search_faces_by_image(
             "SearchedFaceConfidence": 99.98
         }
     """
-    client = get_rekognition_client()
+    client = get_rekognition_client(creds)
     image = get_image_bytes(image_path)
 
     response = client.search_faces_by_image(
@@ -224,6 +240,9 @@ async def search_faces_by_image(
 @mcp.tool()
 @handle_exceptions
 async def detect_labels(
+    creds: AwsCredentials = Field(
+        ..., description="AWS credentials: access_key, secret_access_key and region"
+    ),
     image_path: str = Field(description='Path to the image file'),
 ) -> Dict:
     """Detects objects, scenes, concepts, and activities in an image.
@@ -238,6 +257,7 @@ async def detect_labels(
     - MinConfidence: 50 (minimum confidence score of 50%)
 
     Args:
+        creds: AWS credentials model or dict with `access_key`, `secret_access_key` and `region`
         image_path: Path to the image file to analyze.
 
     Returns:
@@ -267,7 +287,7 @@ async def detect_labels(
             ]
         }
     """
-    client = get_rekognition_client()
+    client = get_rekognition_client(creds)
     image = get_image_bytes(image_path)
 
     response = client.detect_labels(
@@ -284,6 +304,9 @@ async def detect_labels(
 @mcp.tool()
 @handle_exceptions
 async def detect_moderation_labels(
+    creds: AwsCredentials = Field(
+        ..., description="AWS credentials: access_key, secret_access_key and region"
+    ),
     image_path: str = Field(description='Path to the image file'),
 ) -> Dict:
     """Detects unsafe or inappropriate content in an image.
@@ -307,6 +330,7 @@ async def detect_moderation_labels(
     taxonomy (e.g., "Violence" might have a child category of "Weapon Violence").
 
     Args:
+        creds: AWS credentials model or dict with `access_key`, `secret_access_key` and `region`
         image_path: Path to the image file to analyze for unsafe content.
 
     Returns:
@@ -329,7 +353,7 @@ async def detect_moderation_labels(
             ]
         }
     """
-    client = get_rekognition_client()
+    client = get_rekognition_client(creds)
     image = get_image_bytes(image_path)
 
     response = client.detect_moderation_labels(
@@ -345,6 +369,9 @@ async def detect_moderation_labels(
 @mcp.tool()
 @handle_exceptions
 async def recognize_celebrities(
+    creds: AwsCredentials = Field(
+        ..., description="AWS credentials: access_key, secret_access_key and region"
+    ),
     image_path: str = Field(description='Path to the image file'),
 ) -> Dict:
     """Recognizes celebrities in an image.
@@ -363,6 +390,7 @@ async def recognize_celebrities(
     recognized as celebrities.
 
     Args:
+        creds: AWS credentials model or dict with `access_key`, `secret_access_key` and `region`
         image_path: Path to the image file containing potential celebrities.
 
     Returns:
@@ -393,7 +421,7 @@ async def recognize_celebrities(
             ]
         }
     """
-    client = get_rekognition_client()
+    client = get_rekognition_client(creds)
     image = get_image_bytes(image_path)
 
     response = client.recognize_celebrities(
@@ -409,6 +437,9 @@ async def recognize_celebrities(
 @mcp.tool()
 @handle_exceptions
 async def compare_faces(
+    creds: AwsCredentials = Field(
+        ..., description="AWS credentials: access_key, secret_access_key and region"
+    ),
     source_image_path: str = Field(description='Path to the source image file'),
     target_image_path: str = Field(description='Path to the target image file'),
 ) -> Dict:
@@ -428,6 +459,7 @@ async def compare_faces(
     or comparing faces for similarity.
 
     Args:
+        creds: AWS credentials model or dict with `access_key`, `secret_access_key` and `region`
         source_image_path: Path to the source image file containing the reference face.
         target_image_path: Path to the target image file containing faces to compare against.
 
@@ -455,7 +487,7 @@ async def compare_faces(
             }
         }
     """
-    client = get_rekognition_client()
+    client = get_rekognition_client(creds)
     source_image = get_image_bytes(source_image_path)
     target_image = get_image_bytes(target_image_path)
 
@@ -475,6 +507,9 @@ async def compare_faces(
 @mcp.tool()
 @handle_exceptions
 async def detect_text(
+        creds: AwsCredentials = Field(
+        ..., description="AWS credentials: access_key, secret_access_key and region"
+    ),
     image_path: str = Field(description='Path to the image file'),
 ) -> Dict:
     """Detects text in an image.
@@ -494,6 +529,7 @@ async def detect_text(
     reading text in natural scenes, or processing documents.
 
     Args:
+        creds: AWS credentials model or dict with `access_key`, `secret_access_key` and `region`
         image_path: Path to the image file containing text to detect.
 
     Returns:
@@ -521,7 +557,7 @@ async def detect_text(
             ]
         }
     """
-    client = get_rekognition_client()
+    client = get_rekognition_client(creds)
     image = get_image_bytes(image_path)
 
     response = client.detect_text(

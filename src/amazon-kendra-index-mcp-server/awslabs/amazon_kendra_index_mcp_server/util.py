@@ -13,12 +13,26 @@
 # limitations under the License.
 """Utility functions for AWS Documentation MCP Server."""
 
-import boto3
 import os
+import boto3
+from typing import Any, Dict, Union
+from pydantic import BaseModel, Field
 from mypy_boto3_kendra.client import KendraClient
 
+class AwsCredentials(BaseModel):
+    access_key: str = Field(..., description="AWS Access Key ID")
+    secret_access_key: str = Field(..., description="AWS Secret Access Key")
 
-def get_kendra_client(region=None) -> KendraClient:
+
+def _get_keys(creds: Union[AwsCredentials, Dict[str, Any]]) -> Dict[str, str]:
+    if isinstance(creds, AwsCredentials):
+        data = creds
+    else:
+        data = AwsCredentials(**creds)  # will validate or raise
+    return data.model_dump(include={"access_key", "secret_access_key"})
+
+
+def get_kendra_client(creds: Union[AwsCredentials, Dict[str, Any]], region=None) -> KendraClient:
     """Get a Kendra runtime client.
 
     Allows access to Kendra Indexes for RAG via the Kendra runtime client.
@@ -26,14 +40,17 @@ def get_kendra_client(region=None) -> KendraClient:
     Returns:
         boto3.client: A boto3 Kendra client instance.
     """
+    # Extract access keys from credentials
+    keys = _get_keys(creds)
+    access_key = keys["access_key"]
+    secret_access_key = keys["secret_access_key"]
     # Initialize the Kendra client with given region or profile
-    AWS_PROFILE = os.environ.get('AWS_PROFILE')
     AWS_REGION = region or os.environ.get('AWS_REGION', 'us-east-1')
-    if AWS_PROFILE:
-        kendra_client = boto3.Session(profile_name=AWS_PROFILE, region_name=AWS_REGION).client(
-            'kendra'
-        )
-        return kendra_client
 
-    kendra_client = boto3.client('kendra', region_name=AWS_REGION)
+    kendra_client = boto3.client(
+        'kendra',
+        aws_access_key_id = access_key,
+        aws_secret_access_key = secret_access_key,
+        region_name=AWS_REGION
+    )
     return kendra_client

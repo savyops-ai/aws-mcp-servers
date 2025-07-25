@@ -117,16 +117,14 @@ async def _check_port_mismatch(
         return {"type": "target_group_error", "error": str(error)}
 
 
-async def _analyze_load_balancer_issues(
-    service: Dict[str, Any], elb_client=None
-) -> List[Dict[str, Any]]:
+async def _analyze_load_balancer_issues(credentials, service: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Analyze load balancer configuration for common issues."""
     load_balancers = service.get("loadBalancers", [])
     if not load_balancers:
         return []
 
     load_balancer_issues = []
-    elb = elb_client or await get_aws_client("elbv2")
+    elb = await get_aws_client(credentials, "elbv2")
 
     for lb in load_balancers:
         lb_issues = []
@@ -152,14 +150,13 @@ async def _analyze_load_balancer_issues(
 
 
 async def fetch_service_events(
+    credentials: Dict[str, Any],
     app_name: str,
     cluster_name: str,
     service_name: str,
     time_window: int = 3600,
     start_time: Optional[datetime.datetime] = None,
     end_time: Optional[datetime.datetime] = None,
-    ecs_client=None,
-    elb_client=None,
 ) -> Dict[str, Any]:
     """
     Service-level diagnostics for ECS services.
@@ -199,7 +196,8 @@ async def fetch_service_events(
             "raw_data": {},
         }
 
-        ecs = ecs_client or await get_aws_client("ecs")
+        # Initialize ECS client using get_aws_client
+        ecs = await get_aws_client(credentials, "ecs")
 
         # Check if service exists
         try:
@@ -274,7 +272,7 @@ async def fetch_service_events(
                     )
 
                 # Check for load balancer issues
-                lb_issues = await _analyze_load_balancer_issues(service, elb_client)
+                lb_issues = await _analyze_load_balancer_issues(credentials, service)
                 if lb_issues:
                     issues.extend(lb_issues)
 

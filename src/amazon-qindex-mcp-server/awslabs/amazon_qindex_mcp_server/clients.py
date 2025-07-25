@@ -40,7 +40,6 @@ class QBusinessClient:
         region_name: str = 'us-east-1',
         aws_access_key_id: Optional[str] = None,
         aws_secret_access_key: Optional[str] = None,
-        aws_session_token: Optional[str] = None,
     ):
         """Initialize Q Business client.
 
@@ -48,12 +47,10 @@ class QBusinessClient:
             region_name (str): AWS region name
             aws_access_key_id (Optional[str]): AWS access key ID
             aws_secret_access_key (Optional[str]): AWS secret access key
-            aws_session_token (Optional[str]): AWS session token
         """
         self.region_name = region_name
         self.aws_access_key_id = aws_access_key_id
         self.aws_secret_access_key = aws_secret_access_key
-        self.aws_session_token = aws_session_token
         self.client = self._get_client()
 
     def _get_client(self) -> Boto3QBusinessClient:
@@ -65,7 +62,6 @@ class QBusinessClient:
         session = boto3.Session(
             aws_access_key_id=self.aws_access_key_id,
             aws_secret_access_key=self.aws_secret_access_key,
-            aws_session_token=self.aws_session_token,
             region_name=self.region_name,
         )
         return session.client('qbusiness', config=Config(user_agent_extra='QIndex-MCP-Server/1.0'))

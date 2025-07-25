@@ -17,6 +17,7 @@ from awslabs.amazon_mq_mcp_server.aws_service_mcp_generator import (
     AWSToolGenerator,
 )
 from awslabs.amazon_mq_mcp_server.consts import MCP_SERVER_VERSION
+from awslabs.amazon_mq_mcp_server.schemas import AwsCredentials
 from mcp.server.fastmcp import FastMCP
 from typing import Any, Dict, List
 
@@ -26,7 +27,8 @@ def create_broker_override(mcp: FastMCP, mq_client_getter: BOTO3_CLIENT_GETTER, 
     """Create a ActiveMQ or RabbitMQ broker on AmazonMQ."""
 
     @mcp.tool()
-    def create_broker(
+    async def create_broker(
+        credentials: AwsCredentials,
         broker_name: str,
         engine_type: str,
         engine_version: str,
@@ -51,7 +53,7 @@ def create_broker_override(mcp: FastMCP, mq_client_getter: BOTO3_CLIENT_GETTER, 
                 'mcp_server_version': MCP_SERVER_VERSION,
             },
         }
-        mq_client = mq_client_getter(region)
+        mq_client = mq_client_getter(region, credentials)
         response = mq_client.create_broker(**create_params)
         return response
 
@@ -61,9 +63,14 @@ def create_configuration_override(mcp: FastMCP, mq_client_getter: BOTO3_CLIENT_G
     """Create configuration for AmazonMQ broker."""
 
     @mcp.tool()
-    def create_configuration(
-        region: str, authentication_strategy: str, engine_type: str, engine_version: str, name: str
-    ):
+    async def create_configuration(
+        credentials: AwsCredentials,
+        region: str,
+        authentication_strategy: str,
+        engine_type: str,
+        engine_version: str,
+        name: str,
+    ) -> Dict[str, Any]:
         """Create configuration for AmazonMQ broker."""
         create_params = {
             'AuthenticationStrategy': authentication_strategy,
@@ -74,7 +81,7 @@ def create_configuration_override(mcp: FastMCP, mq_client_getter: BOTO3_CLIENT_G
                 'mcp_server_version': MCP_SERVER_VERSION,
             },
         }
-        mq_client = mq_client_getter(region)
+        mq_client = mq_client_getter(region, credentials)
         response = mq_client.create_configuration(**create_params)
         return response
 
@@ -100,7 +107,7 @@ def allow_mutative_action_only_on_tagged_resource(
 # instantiate base server
 mcp = FastMCP(
     'awslabs.amazon-mq-mcp-server',
-    instructions="""Manage RabbitMQ and ActiveMQ message brokers on AmazonMQ.""",
+    instructions="Manage RabbitMQ and ActiveMQ message brokers on AmazonMQ.",
     dependencies=['pydantic', 'boto3'],
 )
 

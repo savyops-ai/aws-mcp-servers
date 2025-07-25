@@ -23,6 +23,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from awslabs.ecs_mcp_server.api.infrastructure import create_infrastructure
+from awslabs.ecs_mcp_server.utils.schemas import AwsCredentials
 
 
 def register_module(mcp: FastMCP) -> None:
@@ -30,6 +31,7 @@ def register_module(mcp: FastMCP) -> None:
 
     @mcp.tool(name="create_ecs_infrastructure")
     async def mcp_create_ecs_infrastructure(
+        credentials: AwsCredentials,
         app_name: str = Field(
             ...,
             description="Name of the application",
@@ -136,6 +138,7 @@ def register_module(mcp: FastMCP) -> None:
             Dictionary containing infrastructure details or template paths
         """
         return await create_infrastructure(
+            credentials=credentials,
             app_name=app_name,
             app_path=app_path,
             force_deploy=force_deploy,

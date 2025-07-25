@@ -15,7 +15,7 @@
 """awslabs amazon-kendra-index-mcp-server MCP Server implementation."""
 
 import os
-from awslabs.amazon_kendra_index_mcp_server.util import get_kendra_client
+from awslabs.amazon_kendra_index_mcp_server.util import AwsCredentials, get_kendra_client
 from mcp.server.fastmcp import FastMCP
 from typing import Any, Dict, Optional
 
@@ -33,6 +33,7 @@ mcp = FastMCP(
 
 @mcp.tool(name='KendraListIndexesTool')
 async def kendra_list_indexes_tool(
+    credentials: AwsCredentials,
     region: Optional[str] = None,
 ) -> Dict[str, Any]:
     """List all Amazon Kendra indexes in the specified region.
@@ -47,9 +48,9 @@ async def kendra_list_indexes_tool(
     """
     try:
         if region:
-            kendra_client = get_kendra_client(region)
+            kendra_client = get_kendra_client(credentials, region)
         else:
-            kendra_client = get_kendra_client()
+            kendra_client = get_kendra_client(credentials)
 
         # List all Kendra indexes
         response = kendra_client.list_indices()
@@ -104,6 +105,7 @@ async def kendra_list_indexes_tool(
 @mcp.tool(name='KendraQueryTool')
 async def kendra_query_tool(
     query: str,
+    credentials: AwsCredentials,
     region: Optional[str] = None,
     indexId: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -123,9 +125,9 @@ async def kendra_query_tool(
     kendra_index_id = indexId or os.getenv('KENDRA_INDEX_ID')
     try:
         if region:
-            kendra_client = get_kendra_client(region)
+            kendra_client = get_kendra_client(credentials, region)
         else:
-            kendra_client = get_kendra_client()
+            kendra_client = get_kendra_client(credentials)
         if not kendra_index_id:
             raise ValueError('KENDRA_INDEX_ID environment variable is not set.')
         # Query the Kendra index

@@ -21,10 +21,18 @@ from awslabs.amazon_rekognition_mcp_server import __version__
 from botocore.config import Config
 from loguru import logger
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, Optional, TypeVar, cast
+from typing import Any, Awaitable, Callable, Dict, Optional, TypeVar, cast, Union
+from awslabs.amazon_rekognition_mcp_server.models import AwsCredentials
 
 
 T = TypeVar('T', bound=Callable[..., Awaitable[Any]])
+
+def _get_keys(creds: Union[AwsCredentials, Dict[str, Any]]) -> Dict[str, str]:
+    if isinstance(creds, AwsCredentials):
+        data = creds
+    else:
+        data = AwsCredentials(**creds)  # will validate or raise
+    return data.model_dump(include={"access_key", "secret_access_key"})
 
 
 def get_base_dir() -> Optional[str]:
@@ -36,22 +44,20 @@ def get_base_dir() -> Optional[str]:
     return os.environ.get('BASE_DIR')
 
 
-def get_aws_session():
+def get_aws_session(creds: AwsCredentials):
     """Create an AWS session using credentials from environment variables."""
-    profile_name = os.environ.get('AWS_PROFILE')
-    region = os.environ.get('AWS_REGION', 'us-east-1')
+    # extract keys
+    keys = _get_keys(creds)
+    region_name = keys.get('region', os.environ.get('AWS_REGION', 'us-east-1'))
+    aws_access_key_id = keys['access_key']
+    aws_secret_access_key = keys['secret_access_key']
 
-    if profile_name:
-        logger.debug(f'Using AWS profile: {profile_name}')
-        return boto3.Session(profile_name=profile_name, region_name=region)
-    else:
-        logger.debug('Using default AWS credential chain')
-        return boto3.Session(region_name=region)
+    logger.debug('Using default AWS credential as provided')
+    return boto3.Session(region_name=region_name, aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
 
-
-def get_rekognition_client():
+def get_rekognition_client(creds: AwsCredentials):
     """Get a Rekognition client."""
-    session = get_aws_session()
+    session = get_aws_session(creds)
     config = Config(user_agent_extra=f'awslabs/mcp/amazon_rekognition_mcp_server/{__version__}')
     return session.client('rekognition', config=config)
 

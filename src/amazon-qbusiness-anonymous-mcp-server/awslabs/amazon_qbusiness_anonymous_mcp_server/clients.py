@@ -12,17 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import boto3
 import os
+import boto3
 import secrets
+from typing import Any, Dict, List, Union
 from awslabs.amazon_qbusiness_anonymous_mcp_server import __version__
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from mypy_boto3_qbusiness.client import QBusinessClient
 from mypy_boto3_qbusiness.type_defs import ChatSyncOutputTypeDef
+from awslabs.amazon_qbusiness_anonymous_mcp_server.models import AwsCredentials
 
 
-def get_qbiz_client() -> QBusinessClient:
+def _get_keys(creds: Union[AwsCredentials, Dict[str, Any]]) -> Dict[str, str]:
+    if isinstance(creds, AwsCredentials):
+        data = creds
+    else:
+        data = AwsCredentials(**creds)  # will validate or raise
+    return data.model_dump(include={"access_key", "secret_access_key"})
+
+
+def get_qbiz_client(creds: AwsCredentials) -> QBusinessClient:
     """Create and return an Amazon Q Business client.
 
     Returns:
@@ -37,20 +47,18 @@ def get_qbiz_client() -> QBusinessClient:
         AWS_REGION: The AWS region where Q Business is deployed
     """
     try:
-        region = os.getenv('AWS_REGION')
-        if not region:
-            raise ValueError('AWS_REGION environment variable is not set')
-        AWS_PROFILE = os.environ.get('AWS_PROFILE')
-        if AWS_PROFILE:
-            config = Config(
-                user_agent_extra=f'awslabs/mcp/amazon_qbusiness_anonymous_mcp_server/{__version__}'
-            )
-            aq_client: QBusinessClient = boto3.Session(
-                profile_name=AWS_PROFILE, region_name=region
-            ).client('qbusiness', config=config)
-            return aq_client
+        # extract keys
+        keys = _get_keys(creds)
+        region = keys.get('region', os.environ.get('AWS_REGION', 'us-east-1'))
+        access_key = keys['access_key']
+        secret_key = keys['secret_access_key']
 
-        aq_client: QBusinessClient = boto3.client('qbusiness', region_name=region)
+        aq_client: QBusinessClient = boto3.client(
+            'qbusiness', 
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            region_name=region,
+        )
         return aq_client
     except Exception as e:
         raise Exception(f'Failed to create Q Business client: {str(e)}')

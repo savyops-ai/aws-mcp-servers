@@ -15,6 +15,7 @@
 """awslabs amazon-qbusiness-anonymous MCP Server implementation."""
 
 from awslabs.amazon_qbusiness_anonymous_mcp_server.clients import get_qbiz_client, make_query
+from awslabs.amazon_qbusiness_anonymous_mcp_server.models import AwsCredentials
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
@@ -43,10 +44,13 @@ mcp = FastMCP(
 )
 
 
-@mcp.tool(name='QBusinessQueryTool')
+@mcp.tool(name='QBusinessQueryTool', annotations=None)
 async def qbiz_local_query(
+    creds: AwsCredentials = Field(
+        ..., description="AWS credentials: access_key and secret_access_key"
+    ),
     query: str = Field(
-        ..., description='User query, question or request to the Amazon Q Business application'
+        ..., description='User query to send to the Amazon Q Business application'
     ),
 ) -> str:
     """MCP tool to query Amazon Q Business and return a formatted response.
@@ -55,6 +59,7 @@ async def qbiz_local_query(
     It handles client initialization, query execution, and error handling automatically.
 
     Args:
+        creds: AWS credentials model or dict with `access_key` & `secret_access_key`
         query (str): The question or query to send to Q Business
 
     Returns:
@@ -77,7 +82,7 @@ async def qbiz_local_query(
         if not query or not query.strip():
             return 'Error: Query cannot be empty'
 
-        client = get_qbiz_client()
+        client = get_qbiz_client(creds)
         resp = make_query(client, query)
 
         # Check if response has the expected structure

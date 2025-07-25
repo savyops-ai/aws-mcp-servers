@@ -75,6 +75,7 @@ mcp = FastMCP(
         "A server for automating containerization and deployment of web applications to AWS ECS"
     ),
     version="0.1.0",
+    host="0.0.0.0",
     instructions="""Use this server to containerize and deploy web applications to AWS ECS.
 
 WORKFLOW:
@@ -128,7 +129,7 @@ def main() -> None:
         logger.info("Server started")
         logger.info(f"Write operations enabled: {config.get('allow-write', False)}")
         logger.info(f"Sensitive data access enabled: {config.get('allow-sensitive-data', False)}")
-        mcp.run()
+        mcp.run(transport='sse')
     except KeyboardInterrupt:
         logger.info("Server stopped by user")
         sys.exit(0)

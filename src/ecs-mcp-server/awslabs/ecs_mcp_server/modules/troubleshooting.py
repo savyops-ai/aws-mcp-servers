@@ -26,6 +26,7 @@ from awslabs.ecs_mcp_server.api.ecs_troubleshooting import (
     TroubleshootingAction,
     ecs_troubleshooting_tool,
 )
+from awslabs.ecs_mcp_server.utils.schemas import AwsCredentials
 
 
 def register_troubleshooting_prompts(mcp: FastMCP, prompt_groups: Dict[str, List[str]]) -> None:
@@ -67,6 +68,7 @@ def register_module(mcp: FastMCP) -> None:
         description=TROUBLESHOOTING_DOCS,  # Dynamically generated documentation string
     )
     async def mcp_ecs_troubleshooting_tool(
+        credentials: AwsCredentials,
         app_name: Optional[str] = None,
         action: TroubleshootingAction = "get_ecs_troubleshooting_guidance",
         parameters: Optional[Dict[str, Any]] = None,
@@ -75,7 +77,7 @@ def register_module(mcp: FastMCP) -> None:
         if parameters is None:
             parameters = {}
 
-        return await ecs_troubleshooting_tool(app_name, action, parameters)
+        return await ecs_troubleshooting_tool(credentials, app_name, action, parameters)
 
     # Define prompt groups for bulk registration
     prompt_groups = {

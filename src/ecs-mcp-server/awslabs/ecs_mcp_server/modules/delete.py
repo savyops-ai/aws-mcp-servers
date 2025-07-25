@@ -23,6 +23,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from awslabs.ecs_mcp_server.api.delete import delete_infrastructure
+from awslabs.ecs_mcp_server.utils.schemas import AwsCredentials
 
 
 def register_module(mcp: FastMCP) -> None:
@@ -30,6 +31,7 @@ def register_module(mcp: FastMCP) -> None:
 
     @mcp.tool(name="delete_ecs_infrastructure")
     async def mcp_delete_ecs_infrastructure(
+        credentials: AwsCredentials,
         app_name: str = Field(
             ...,
             description="Name of the application",
@@ -75,6 +77,7 @@ def register_module(mcp: FastMCP) -> None:
             Dictionary containing deletion results and guidance
         """
         return await delete_infrastructure(
+            credentials=credentials,
             app_name=app_name,
             ecr_template_path=ecr_template_path,
             ecs_template_path=ecs_template_path,

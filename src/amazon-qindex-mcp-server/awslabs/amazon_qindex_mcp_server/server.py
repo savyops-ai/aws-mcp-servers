@@ -17,6 +17,7 @@
 import boto3
 import os
 import sys
+from typing import Dict, List, Union, Any
 from awslabs.amazon_qindex_mcp_server.clients import QBusinessClient, QBusinessClientError
 from loguru import logger
 from mcp.server.fastmcp import FastMCP
@@ -117,193 +118,18 @@ mcp = FastMCP(
     ],
 )
 
-
-@mcp.tool(name='AuthorizeQIndex')
-async def authorize_qindex(
-    idc_region: str = Field(
-        description='The AWS region for IAM Identity Center (e.g., us-west-2)'
-    ),
-    isv_redirect_url: str = Field(
-        description='The redirect URL registered during ISV registration'
-    ),
-    oauth_state: str = Field(description='Random string to prevent CSRF attacks'),
-    idc_application_arn: str = Field(
-        description='The Amazon Q Business application ID provided by the customer'
-    ),
-) -> Dict:
-    """Generate the OIDC authorization URL for Q index authentication.
-
-    This tool generates the URL that users need to visit to authenticate with their
-    Amazon Q Business application through their OIDC provider.
-
-    Parameters:
-        idc_region (str): The AWS region for IAM Identity Center (e.g., us-west-2)
-        isv_redirect_url (str): The redirect URL registered during ISV registration
-        oauth_state (str): Random string to prevent CSRF attacks
-        idc_application_arn (str): The Amazon Q Business application ID provided by the customer
-
-    Returns:
-        Dict: Response containing the authorization URL
-        {
-            'authorization_url': 'string'
-        }
-    """
-    auth_url = (
-        f'https://oidc.{idc_region}.amazonaws.com/authorize'
-        f'?response_type=code'
-        f'&redirect_uri={isv_redirect_url}'
-        f'&state={oauth_state}'
-        f'&client_id={idc_application_arn}'
-    )
-
-    # Ask the user to visit the URL and provide the authorization code
-    raise ValueError(
-        f'Please visit this URL to sign in: {auth_url}\n'
-        'After signing in, you will be redirected to your redirect URL.\n'
-        'Please provide the authorization code from the redirect URL to continue.'
-    )
-
-
-@mcp.tool(name='CreateTokenWithIAM')
-async def create_token_with_iam(
-    idc_application_arn: str = Field(description='The Amazon Q Business application ID'),
-    redirect_uri: str = Field(description='The redirect URL registered during ISV registration'),
-    code: str = Field(description='The authorization code received from OIDC endpoint'),
-    idc_region: str = Field(description='The AWS region for IAM Identity Center'),
-    role_arn: str = Field(description='The ARN of the IAM role to assume'),
-) -> Dict:
-    """Get a token using the authorization code through IAM.
-
-    This tool calls the CreateTokenWithIAM API to get a token using the authorization code
-    received from the OIDC endpoint.
-
-    Parameters:
-        idc_application_arn (str): The Amazon Q Business application ID
-        redirect_uri (str): The redirect URL registered during ISV registration
-        code (str): The authorization code received from OIDC endpoint
-        idc_region (str): The AWS region for IAM Identity Center
-        role_arn (str): The ARN of the IAM role to assume
-
-    Returns:
-        Dict: Response containing the token information
-        {
-            'accessToken': 'string',
-            'tokenType': 'string',
-            'expiresIn': 123,
-            'refreshToken': 'string',
-            'idToken': 'string'
-        }
-    """
-    try:
-        # Create boto3 client for SSO OIDC
-        aws_profile = os.environ.get('AWS_PROFILE', 'default')
-        session = boto3.Session(region_name=idc_region, profile_name=aws_profile)
-
-        sts_client = session.client('sts')
-
-        assume_role_response = sts_client.assume_role(
-            RoleArn=role_arn,
-            RoleSessionName='automated-session',
-            Tags=[
-                {
-                    'Key': 'qbusiness-dataaccessor:ExternalId',
-                    'Value': 'Test-Tenant',  # Replace with your actual tenant ID variable
-                }
-            ],
-        )
-
-        # Get the temporary credentials from the assumed role
-        temp_credentials = assume_role_response['Credentials']
-
-        assumed_session = boto3.Session(
-            aws_access_key_id=temp_credentials['AccessKeyId'],
-            aws_secret_access_key=temp_credentials['SecretAccessKey'],
-            aws_session_token=temp_credentials['SessionToken'],
-            region_name=idc_region,
-        )
-
-        client = assumed_session.client('sso-oidc')
-
-        response = client.create_token_with_iam(
-            clientId=idc_application_arn,
-            redirectUri=redirect_uri,
-            grantType='authorization_code',
-            code=code,
-        )
-
-        return response
-    except Exception as e:
-        logger.error(f'Error creating token with IAM: {str(e)}')
-        raise ValueError(str(e))
-
-
-@mcp.tool(name='AssumeRoleWithIdentityContext')
-async def assume_role_with_identity_context(
-    role_arn: str = Field(description='The ARN of the IAM role to assume'),
-    identity_context: str = Field(
-        description='The sts:identity_context value from the decoded token'
-    ),
-    idc_region: str = Field(description='The AWS region for IAM Identity Center'),
-    role_session_name: str = Field(
-        default='qbusiness-session', description='An identifier for the assumed role session'
-    ),
-) -> Dict:
-    """Assume an IAM role using the identity context from the token.
-
-    This tool calls the AssumeRole API with the identity context extracted from the token
-    to get temporary credentials.
-
-    Parameters:
-        role_arn (str): The ARN of the IAM role to assume
-        identity_context (str): The sts:identity_context value from the decoded token
-        role_session_name (str): An identifier for the assumed role session
-
-    Returns:
-        Dict: Response containing the temporary credentials
-        {
-            'Credentials': {
-                'AccessKeyId': 'string',
-                'SecretAccessKey': 'string', # pragma: allowlist secret
-                'SessionToken': 'string',
-                'Expiration': datetime(2015, 1, 1)
-            },
-            'AssumedRoleUser': {
-                'AssumedRoleId': 'string',
-                'Arn': 'string'
-            }
-        }
-    """
-    try:
-        # Create boto3 client for STS
-        aws_profile = os.environ.get('AWS_PROFILE', 'default')
-        session = boto3.Session(region_name=idc_region, profile_name=aws_profile)
-        client = session.client('sts')
-
-        response = client.assume_role(
-            RoleArn=role_arn,
-            RoleSessionName=role_session_name,
-            ProvidedContexts=[
-                {
-                    'ProviderArn': 'arn:aws:iam::aws:contextProvider/IdentityCenter',
-                    'ContextAssertion': identity_context,
-                }
-            ],
-            Tags=[
-                {
-                    'Key': 'qbusiness-dataaccessor:ExternalId',
-                    'Value': 'Test-Tenant',  # Replace with your actual tenant ID variable
-                }
-            ],
-        )
-
-        return response
-    except Exception as e:
-        logger.error(f'Error assuming role with identity context: {str(e)}')
-        raise ValueError(str(e))
-
+def _get_keys(creds: Union[AwsCredentials, Dict[str, Any]]) -> Dict[str, str]:
+    if isinstance(creds, AwsCredentials):
+        data = creds
+    else:
+        data = AwsCredentials(**creds)  # will validate or raise
+    return data.model_dump(include={"access_key", "secret_access_key"})
 
 @mcp.tool(name='SearchRelevantContent')
 async def search_relevant_content(
+    creds: AwsCredentials = Field(
+        ..., description="AWS credentials: access_key, secret_access_key and region"
+    ),
     application_id: str = Field(
         description='The unique identifier of the application to search in'
     ),
@@ -321,18 +147,6 @@ async def search_relevant_content(
     ),
     next_token: Optional[str] = Field(
         default=None, description='Token for pagination to get the next set of results'
-    ),
-    qbuiness_region: str = Field(
-        default='us-east-1', description='The AWS region in which Qbusiness application is present'
-    ),
-    aws_access_key_id: Optional[str] = Field(
-        default=None, description='AWS access key ID from temporary credentials'
-    ),
-    aws_secret_access_key: Optional[str] = Field(
-        default=None, description='AWS secret access key from temporary credentials'
-    ),
-    aws_session_token: Optional[str] = Field(
-        default=None, description='AWS session token from temporary credentials'
     ),
 ) -> SearchRelevantContentResponseTypeDef:
     """Search for relevant content in an Amazon Q Business application.
@@ -357,10 +171,6 @@ async def search_relevant_content(
         content_source (Optional[ContentSource]): Configuration specifying which content sources to include in the search
         max_results (Optional[int]): Maximum number of results to return (1-100)
         next_token (Optional[str]): Token for pagination to get the next set of results
-        qbuiness_region (str): The AWS region in which Qbusiness application is present
-        aws_access_key_id (Optional[str]): AWS access key ID from temporary credentials
-        aws_secret_access_key (Optional[str]): AWS secret access key from temporary credentials
-        aws_session_token (Optional[str]): AWS session token from temporary credentials
 
 
     Returns:
@@ -392,16 +202,21 @@ async def search_relevant_content(
         ValueError: If there's an error with the Q Business API call or if credentials are missing/invalid
     """
     try:
+        # extract keys
+        keys = _get_keys(creds)
+        region_name = keys.get('region', os.environ.get('AWS_REGION', 'us-east-1'))
+        aws_access_key_id = keys['access_key']
+        aws_secret_access_key = keys['secret_access_key']
+        
         # Check for credentials first
         if not aws_access_key_id or not aws_secret_access_key:
             raise QBusinessClientError('Missing AWS credentials')
 
         # Create QBusinessClient with provided credentials
         client = QBusinessClient(
-            region_name=qbuiness_region,
+            region_name=region_name,
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
-            aws_session_token=aws_session_token,
         )
 
         # Convert models to dictionaries
@@ -429,10 +244,6 @@ async def search_relevant_content(
         )
     except Exception as e:
         logger.error(f'Error searching Q Business content: {str(e)}')
-        if not aws_access_key_id or not aws_secret_access_key or not aws_session_token:
-            raise ValueError(
-                'Missing AWS credentials. Please follow the authentication flow described in the tool documentation.'
-            )
         raise ValueError(str(e))
 
 

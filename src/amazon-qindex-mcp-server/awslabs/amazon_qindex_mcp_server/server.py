@@ -97,6 +97,10 @@ class ContentSource(BaseModel):
         default=None, description='Retriever to use as content source'
     )
 
+class AwsCredentials(BaseModel):
+    access_key: str = Field(..., description="AWS Access Key ID")
+    secret_access_key: str = Field(..., description="AWS Secret Access Key")
+    region: str = Field("us-east-1", description="AWS Region, defaults to us-east-1")
 
 # # Update forward references for recursive AttributeFilter
 AttributeFilter.model_rebuild()

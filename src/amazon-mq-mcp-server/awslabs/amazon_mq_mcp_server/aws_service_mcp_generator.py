@@ -70,41 +70,34 @@ class AWSToolGenerator:
 
     def __register_operations(self):
         for operation in self.__get_operations():
-            if operation not in self.tool_configuration:
-                func = self.__create_operation_function(operation)
-                if func is not None:
-                    self.mcp.tool(description=func.__doc__)(func)
-            else:
-                config = self.tool_configuration[operation]
-                if config.get('ignore'):
-                    continue
-                if config.get('func_override') is not None:
-                    fn = config.get('func_override')
-                    assert fn is not None
-                    self.__handle_function_override(operation, fn)
-                    continue
-                func = self.__create_operation_function(
-                    operation,
-                    config.get('documentation_override'),
-                    config.get('validator'),
-                )
-                if func is not None:
-                    self.mcp.tool(description=func.__doc__)(func)
+            cfg = self.tool_configuration.get(operation, {})
+            if cfg.get('ignore'):
                 continue
+            if cfg.get('func_override'):
+                self.__handle_override(operation, cfg['func_override'])
+            else:
+                fn = self.__create_operation_function(
+                    operation,
+                    cfg.get('documentation_override'),
+                    cfg.get('validator'),
+                )
+                if fn:
+                    self.mcp.tool(description=fn.__doc__)(fn)
 
-    def __get_client(self, region: str = 'us-east-1') -> Any:
+    def __get_client(self, creds: Dict[str, Any], region: str = 'us-east-1') -> Any:
         """Get or create a service client for the specified region."""
         client_key = f'{self.service_name}_{region}'
         if client_key not in self.clients:
-            aws_profile = os.environ.get('AWS_PROFILE', 'default')
             self.clients[client_key] = boto3.Session(
-                profile_name=aws_profile, region_name=region
+                aws_access_key_id=creds['access_key'],
+                aws_secret_access_key=creds['secret_access_key'],
+                region_name=region
             ).client(self.service_name)
         return self.clients[client_key]
 
     def __get_operations(self) -> List[str]:
         """Get all available operations from boto3 for this service."""
-        default_client = self.__get_client()
+        default_client = boto3.client(self.service_name)
         operations = [
             op
             for op in dir(default_client)
@@ -112,120 +105,88 @@ class AWSToolGenerator:
         ]
         return sorted(operations)
 
-    def __handle_function_override(self, operation: str, func_override: Any) -> None:
-        """Handle overriding the behaviour of an operation by invoking user provided function. It will pass a boto3 client (default to us-east-1), current MCP server, and the current operation."""
-
-        # A getter for the boto3 client
-        def boto3_client_getter(region: str, service_name: str = self.service_name):
-            aws_profile = os.environ.get('AWS_PROFILE', 'default')
-            return boto3.Session(profile_name=aws_profile, region_name=region).client(service_name)
-
-        func_override(self.mcp, boto3_client_getter, operation)
+    def __handle_override(
+        self,
+        operation: str,
+        override_fn: OVERRIDE_FUNC_TYPE,
+    ):
+        def client_getter(region: str, credentials: Dict[str, str]):
+            return self.__get_client(region, credentials)
+        override_fn(self.mcp, client_getter, operation)
 
     def __create_operation_function(
         self,
         operation: str,
-        documentation_override: str | None = None,
-        validator: Any = None,
-    ) -> Callable | None:
-        """Create a function for a specific service operation."""
-        # Get information about parameters and their types
-        parameters = []
-        type_conversion = {
-            'string': str,
-            'boolean': bool,
-            'integer': int,
-            'map': dict[Any, Any],
-        }
-        type_default = {
-            'string': str(),
-            'boolean': bool(),
-            'integer': 10,
-            'map': {},
-        }
+        doc_override: str | None,
+        validator: VALIDATOR | None,
+    ) -> Callable[..., Any] | None:
         try:
-            input_parameters = self.__get_operation_input_parameters(operation)
-            for param_tuple in input_parameters:
-                param_name = param_tuple[0]
-                param_type = param_tuple[1]
-                param_is_required = param_tuple[2]
-                param_documentation = param_tuple[3]
-                if param_is_required:
-                    parameters.insert(
-                        0,
-                        inspect.Parameter(
-                            name=param_name,
-                            kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                            annotation=type_conversion.get(param_type, str),
-                        ),
-                    )
-                else:
-                    parameters.append(
-                        inspect.Parameter(
-                            name=param_name,
-                            kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                            annotation=Annotated[
-                                type_conversion.get(param_type, str),
-                                Field(description=param_documentation),
-                            ],
-                            default=type_default.get(param_type, str()),
-                        )
-                    )
-            # Add region to dynamically change region such that one MCP server can interact with multiple region
-            parameters.append(
-                inspect.Parameter(
-                    name='region',
-                    kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                    annotation=Annotated[
-                        str, Field(description='AWS region on which the broker is in')
-                    ],
-                    default='us-east-1',
-                )
-            )
+            params_meta = self.__get_operation_input_parameters(operation)
         except Exception:
-            print(
-                f'operation model for: {operation} not found, skipping tool creation',
-                file=sys.stderr,
-            )
+            print(f"Skipping {operation}: cannot get model", file=sys.stderr)
             return None
 
-        # Function template
-        async def operation_function(*args, **kwargs) -> Dict[str, Any]:
-            bound_args = operation_function.__signature__.bind(*args, **kwargs)
-            bound_args.apply_defaults()
+        # Build signature: credentials + each API param + region
+        parameters: List[inspect.Parameter] = [
+            inspect.Parameter(
+                'credentials',
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                annotation=Dict[str, str],
+            )
+        ]
+        type_map = {'string': str, 'boolean': bool, 'integer': int, 'map': dict}
+        default_map = {'string': '', 'boolean': False, 'integer': 0, 'map': {}}
+
+        for name, tname, req, doc in params_meta:
+            ann = type_map.get(tname, str)
+            if req:
+                parameters.append(
+                    inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=ann)
+                )
+            else:
+                parameters.append(
+                    inspect.Parameter(
+                        name,
+                        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                        annotation=Annotated[ann, Field(description=doc)],
+                        default=default_map.get(tname),
+                    )
+                )
+
+        parameters.append(
+            inspect.Parameter('region', inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=str)
+        )
+
+        async def operation_fn(*args, **kwargs) -> Dict[str, Any]:
+            bound = operation_fn.__signature__.bind(*args, **kwargs)
+            bound.apply_defaults()
+            creds = bound.arguments['credentials']
+            region = bound.arguments['region']
+            # remove our extras before calling AWS
+            call_args = {
+                k: v
+                for k, v in bound.arguments.items()
+                if k not in ('credentials', 'region')
+            }
+            client = self.__get_client(region, creds)
+            if validator:
+                ok, msg = validator(self.mcp, client, call_args)
+                if not ok:
+                    return {'error': msg}
             try:
-                # getting the client that correspond to the region
-                client = self.__get_client(bound_args.arguments['region'])
-                method = getattr(client, operation)
-                kwargs = bound_args.arguments
-                del kwargs['region']  # region is not a valid argument to the boto3 API
-                if validator is not None:
-                    status, msg = validator(self.mcp, client, kwargs)
-                    if status is False:
-                        return {'error': msg}
-                response = method(**kwargs)
-                if 'ResponseMetadata' in response:
-                    del response['ResponseMetadata']
-                return response
+                resp = getattr(client, operation)(**call_args)
+                resp.pop('ResponseMetadata', None)
+                return resp
             except ClientError as e:
-                error_message = e.response.get('Error', {}).get('Message', str(e))
-                return {'error': error_message, 'code': e.response.get('Error', {}).get('Code')}
+                err = e.response.get('Error', {})
+                return {'error': err.get('Message', str(e)), 'code': err.get('Code')}
             except Exception as e:
                 return {'error': str(e)}
 
-        # Set function metadata
-        operation_function.__name__ = f'{operation}'
-        # Set docstring of the tool which is used as part of the prompt for the LLM
-        tool_description = (
-            (f'Execute the AWS {self.service_display_name} `{operation}` operation.')
-            if documentation_override is None
-            else documentation_override
-        )
-        operation_function.__doc__ = tool_description
-        sig = inspect.Signature(parameters)
-        operation_function.__signature__ = sig
-
-        return operation_function
+        operation_fn.__name__ = operation
+        operation_fn.__doc__ = doc_override or f"Execute AWS {self.service_display_name} `{operation}`."
+        operation_fn.__signature__ = inspect.Signature(parameters)
+        return operation_fn
 
     def __get_operation_input_parameters(
         self, operation_name: str

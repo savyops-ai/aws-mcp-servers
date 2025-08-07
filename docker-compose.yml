@@ -10,7 +10,7 @@ services:
   #     ALLOW_WRITE: ${ALLOW_WRITE:-false}
   #     ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
   #   ports:
-  #     - 127.0.0.1:8000:8000
+  #     - 127.0.0.1:9100:9100
   #   networks:
   #     - mcp-servers-network
 
@@ -25,7 +25,7 @@ services:
       ALLOW_WRITE: ${ALLOW_WRITE:-false}
       ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
     ports:
-      - 127.0.0.1:9000:9000
+      - 127.0.0.1:9200:9200
     networks:
       - mcp-servers-network
 
@@ -35,12 +35,8 @@ services:
       dockerfile: Dockerfile
     image: terraform-mcp-server:latest
     container_name: terraform-mcp-server
-    environment:
-      FASTMCP_LOG_LEVEL: ${FASTMCP_LOG_LEVEL:-INFO}
-      ALLOW_WRITE: ${ALLOW_WRITE:-false}
-      ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
     ports:
-      - 127.0.0.1:9100:9100
+      - 127.0.0.1:9300:9300
     networks:
       - mcp-servers-network
 
@@ -61,7 +57,7 @@ services:
   #     ALLOW_WRITE: ${ALLOW_WRITE:-false}
   #     ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
   #   ports:
-  #     - 127.0.0.1:9200:9200
+  #     - 127.0.0.1:9400:9400
   #   networks:
   #     - mcp-servers-network
 
@@ -79,7 +75,7 @@ services:
   #     ALLOW_WRITE: ${ALLOW_WRITE:-false}
   #     ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
   #   ports:
-  #     - 127.0.0.1:9300:9300
+  #     - 127.0.0.1:9500:9500
   #   networks:
   #     - mcp-servers-network
 
@@ -96,7 +92,7 @@ services:
       ALLOW_WRITE: ${ALLOW_WRITE:-false}
       ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
     ports:
-      - 127.0.0.1:9400:9400
+      - 127.0.0.1:9600:9600
     networks:
       - mcp-servers-network
 
@@ -110,7 +106,7 @@ services:
       ALLOW_WRITE: ${ALLOW_WRITE:-false}
       ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
     ports:
-      - 127.0.0.1:9500:9500
+      - 127.0.0.1:9700:9700
     networks:
       - mcp-servers-network
 
@@ -127,7 +123,7 @@ services:
       ALLOW_WRITE: ${ALLOW_WRITE:-false}
       ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
     ports:
-      - 127.0.0.1:9600:9600
+      - 127.0.0.1:9800:9800
     networks:
       - mcp-servers-network
 
@@ -144,7 +140,7 @@ services:
       ALLOW_WRITE: ${ALLOW_WRITE:-false}
       ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
     ports:
-      - 127.0.0.1:9700:9700
+      - 127.0.0.1:9900:9900
     networks:
       - mcp-servers-network
 
@@ -160,7 +156,7 @@ services:
       ALLOW_WRITE: ${ALLOW_WRITE:-false}
       ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
     ports:
-      - 127.0.0.1:9800:9800
+      - 127.0.0.1:10000:10000
     networks:
       - mcp-servers-network
 
@@ -176,7 +172,7 @@ services:
   #     ALLOW_WRITE: ${ALLOW_WRITE:-false}
   #     ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
   #   ports:
-  #     - 127.0.0.1:9900:9900
+  #     - 127.0.0.1:10100:10100
   #   networks:
   #     - mcp-servers-network
 

@@ -77,6 +77,8 @@ mcp = FastMCP(
         "to AWS services and resources in an AWS account."
     ),
     dependencies=["pydantic", "boto3"],
+    host="0.0.0.0",
+    port="9400",
 )
 
 
@@ -261,7 +263,7 @@ def register_lambda_functions():
 # ------------------------------------------------------------------------------
 def main():
     register_lambda_functions()
-    mcp.run()
+    mcp.run(transport='sse')
 
 
 if __name__ == "__main__":

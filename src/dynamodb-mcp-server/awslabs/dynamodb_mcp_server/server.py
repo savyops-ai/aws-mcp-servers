@@ -108,6 +108,8 @@ This tool provides systematic methodology for creating production-ready multi-ta
 advanced optimizations, cost analysis, and integration patterns.
 """,
     version='0.1.3',
+    host="0.0.0.0",
+    port="9500",
 )
 
 
@@ -938,7 +940,7 @@ async def list_imports(
 
 def main():
     """Main entry point for the MCP server application."""
-    app.run()
+    app.run(transport='sse')
 
 
 if __name__ == '__main__':

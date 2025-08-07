@@ -98,6 +98,8 @@ mcp = FastMCP(
     4. Install AWS CLI and SAM CLI
     """,
     dependencies=['pydantic', 'boto3', 'loguru'],
+    host="0.0.0.0",
+    port="10100",
 )
 
 
@@ -222,7 +224,7 @@ def main() -> int:
 
     try:
         logger.info(f'Starting AWS Serverless MCP Server in {", ".join(mode_info)}')
-        mcp.run()
+        mcp.run(transport='sse')
         return 0
     except Exception as e:
         logger.error(f'Error starting AWS Serverless MCP Server: {e}')

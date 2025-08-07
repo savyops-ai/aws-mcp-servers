@@ -29,7 +29,7 @@ mcp = FastMCP(
         'loguru',
     ],
     host="0.0.0.0",
-    port="9800",
+    port="10000",
 )
 
 # Initialize and register CloudWatch tools

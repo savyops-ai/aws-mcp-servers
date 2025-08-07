@@ -27,4 +27,6 @@ mcp = FastMCP(
         'loguru',
         'boto3',
     ],
+    host="0.0.0.0",
+    port="9600",
 )

@@ -45,7 +45,7 @@ def main():
     Context.initialize(args.readonly)
 
     logger.info('Amazon ElastiCache MCP Server Started...')
-    mcp.run()
+    mcp.run(transport='sse')
 
 
 if __name__ == '__main__':

@@ -181,6 +181,8 @@ mcp = FastMCP(
     dependencies=[
         'loguru',
     ],
+    host="0.0.0.0",
+    port="9900",
 )
 
 
@@ -422,7 +424,7 @@ def main():
     logger.success('Successfully validated RDS API db connection to Postgres')
 
     logger.info('Starting Postgres MCP server')
-    mcp.run()
+    mcp.run(transport='sse')
 
 
 if __name__ == '__main__':

@@ -75,6 +75,8 @@ mcp = FastMCP(
     Returns the schema of a table.
     """,
     dependencies=['loguru'],
+    host="0.0.0.0",
+    port="9700",
 )
 
 # ----------------------------------------------------------------------------
@@ -313,7 +315,7 @@ def main():
         sys.exit(1)
 
     logger.success('Connection to Aurora DSQL validated')
-    mcp.run()
+    mcp.run(transport='sse')
 
 if __name__ == '__main__':
     main()

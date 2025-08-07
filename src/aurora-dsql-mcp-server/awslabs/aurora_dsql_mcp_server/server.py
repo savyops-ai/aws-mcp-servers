@@ -6,8 +6,9 @@ from typing import Annotated, List, Optional, Dict
 import boto3
 import psycopg
 from loguru import logger
+from pydantic import BaseModel, Field
 from mcp.server.fastmcp import Context, FastMCP
-from pydantic import BaseModel, Field, validator
+from cryptography.fernet import Fernet, InvalidToken
 
 from awslabs.aurora_dsql_mcp_server.consts import (
     BEGIN_READ_ONLY_TRANSACTION_SQL,
@@ -55,6 +56,52 @@ read_only: bool = True
 persistent_connection: Optional[psycopg.AsyncConnection] = None
 
 # ----------------------------------------------------------------------------
+# Functions to get the Fernet key from environment variable and decrypt tokens
+# ----------------------------------------------------------------------------
+def get_fernet_key() -> str:
+    """
+    Gets the Fernet key from environment variable or generates a new one.
+
+    Returns:
+        str: The Fernet key
+    """
+    fernet_key = os.getenv("FERNET_KEY")
+    if not fernet_key:
+        raise ValueError("FERNET_KEY environment variable is not set")
+    
+    try:
+        # Validate the Fernet key
+        Fernet(fernet_key.encode())
+    except InvalidToken as e:
+        raise ValueError("Invalid FERNET_KEY provided") from e
+
+    return fernet_key
+
+
+def decrypt_token(token: str) -> str:
+    """
+    Decrypts a token using the Fernet key.
+
+    Args:
+        token (str): The encrypted token to decrypt
+
+    Returns:
+        str: The decrypted plaintext string
+
+    Raises:
+        HTTPException: If decryption fails
+    """
+    fernet_key = get_fernet_key()
+    fernet = Fernet(fernet_key.encode())
+
+    try:
+        decrypted_bytes = fernet.decrypt(token.encode("utf-8"))
+        return decrypted_bytes.decode("utf-8")
+    except InvalidToken as e:
+        raise ValueError("Decryption failure") from e
+
+
+# ----------------------------------------------------------------------------
 # MCP server definition
 # ----------------------------------------------------------------------------
 mcp = FastMCP(
@@ -84,6 +131,10 @@ mcp = FastMCP(
 # ----------------------------------------------------------------------------
 
 def create_dsql_client(aws_config: AWSConfig):
+    region = aws_config.region_name
+    access_key_id = decrypt_token(aws_config.aws_access_key_id)
+    secret_access_key = decrypt_token(aws_config.aws_secret_access_key)
+        
     session = boto3.Session(
         aws_access_key_id=aws_config.aws_access_key_id,
         aws_secret_access_key=aws_config.aws_secret_access_key,

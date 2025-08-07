@@ -19,6 +19,7 @@ import boto3
 from botocore.config import Config
 from typing import Any, Optional, Type
 from pydantic import BaseModel, Field
+from cryptography.fernet import Fernet, InvalidToken
 
 # ------------------------------------------------------------------------------
 # Pydantic model for AWS credentials + region
@@ -28,6 +29,54 @@ class AWSConfig(BaseModel):
     aws_access_key_id: str = Field(..., description="AWS access key ID")
     aws_secret_access_key: str = Field(..., description="AWS secret access key")
     region_name: str = Field(..., description="AWS region, e.g. 'us-east-1'")
+
+
+# ----------------------------------------------------------------------------------------------
+# Functions to get the Fernet key from environment variable and decrypt tokens
+# ----------------------------------------------------------------------------------------------
+def get_fernet_key() -> str:
+    """
+    Gets the Fernet key from environment variable or generates a new one.
+
+    Returns:
+        str: The Fernet key
+    """
+    fernet_key = os.getenv("FERNET_KEY")
+    if not fernet_key:
+        raise ValueError("FERNET_KEY environment variable is not set")
+    
+    try:
+        # Validate the Fernet key
+        Fernet(fernet_key.encode())
+    except InvalidToken as e:
+        raise ValueError("Invalid FERNET_KEY provided") from e
+
+    return fernet_key
+
+
+def decrypt_token(token: str) -> str:
+    """
+    Decrypts a token using the Fernet key.
+
+    Args:
+        token (str): The encrypted token to decrypt
+
+    Returns:
+        str: The decrypted plaintext string
+
+    Raises:
+        HTTPException: If decryption fails
+    """
+    fernet_key = get_fernet_key()
+    fernet = Fernet(fernet_key.encode())
+
+    try:
+        decrypted_bytes = fernet.decrypt(token.encode("utf-8"))
+        return decrypted_bytes.decode("utf-8")
+    except InvalidToken as e:
+        raise ValueError("Decryption failure") from e
+
+
 
 # ------------------------------------------------------------------------------
 # Base connection manager using AWSConfig
@@ -60,6 +109,11 @@ class BaseConnectionManager:
             connect_timeout = int(os.environ.get(f"{cls._env_prefix}_CONNECT_TIMEOUT", "5"))
             read_timeout = int(os.environ.get(f"{cls._env_prefix}_READ_TIMEOUT", "10"))
 
+            # Extract values from AWSConfig
+            region = aws_config.region_name
+            access_key_id = decrypt_token(aws_config.aws_access_key_id)
+            secret_access_key = decrypt_token(aws_config.aws_secret_access_key)
+
             config = Config(
                 retries={"max_attempts": max_retries, "mode": retry_mode},
                 connect_timeout=connect_timeout,
@@ -70,9 +124,9 @@ class BaseConnectionManager:
             # instantiate client with explicit credentials
             cls._client = boto3.client(
                 cls._service_name,
-                aws_access_key_id=aws_config.aws_access_key_id,
-                aws_secret_access_key=aws_config.aws_secret_access_key,
-                region_name=aws_config.region_name,
+                aws_access_key_id=access_key_id,
+                aws_secret_access_key=secret_access_key,
+                region_name=region,
                 config=config,
             )
 

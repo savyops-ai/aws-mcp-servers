@@ -20,6 +20,7 @@ from botocore.config import Config
 from loguru import logger
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
+from cryptography.fernet import Fernet, InvalidToken
 
 
 class AWSConfig(BaseModel):
@@ -27,6 +28,50 @@ class AWSConfig(BaseModel):
     aws_access_key_id: Optional[str] = Field(..., description="AWS access key ID")
     aws_secret_access_key: Optional[str] = Field(..., description="AWS secret access key")
     region_name: str = Field("us-east-1", description="AWS region name, e.g. 'us-east-1'")
+
+
+def get_fernet_key() -> str:
+    """
+    Gets the Fernet key from environment variable or generates a new one.
+
+    Returns:
+        str: The Fernet key
+    """
+    fernet_key = os.getenv("FERNET_KEY")
+    if not fernet_key:
+        raise ValueError("FERNET_KEY environment variable is not set")
+    
+    try:
+        # Validate the Fernet key
+        Fernet(fernet_key.encode())
+    except InvalidToken as e:
+        raise ValueError("Invalid FERNET_KEY provided") from e
+
+    return fernet_key
+
+
+def decrypt_token(token: str) -> str:
+    """
+    Decrypts a token using the Fernet key.
+
+    Args:
+        token (str): The encrypted token to decrypt
+
+    Returns:
+        str: The decrypted plaintext string
+
+    Raises:
+        HTTPException: If decryption fails
+    """
+    fernet_key = get_fernet_key()
+    fernet = Fernet(fernet_key.encode())
+
+    try:
+        decrypted_bytes = fernet.decrypt(token.encode("utf-8"))
+        return decrypted_bytes.decode("utf-8")
+    except InvalidToken as e:
+        raise ValueError("Decryption failure") from e
+
 
 class AwsHelper:
     """Helper for creating AWS service clients using AWSConfig."""
@@ -61,12 +106,16 @@ class AwsHelper:
         if key in cls._client_cache:
             logger.info(f"Using cached boto3 client for {service_name} (key={key})")
             return cls._client_cache[key]
+        
+        region = aws_config.region_name
+        access_key_id = decrypt_token(aws_config.aws_access_key_id)
+        secret_access_key = decrypt_token(aws_config.aws_secret_access_key)
 
         # Build session parameters
         session_kwargs: Dict[str, Any] = {
-            'aws_access_key_id': aws_config.aws_access_key_id,
-            'aws_secret_access_key': aws_config.aws_secret_access_key,
-            'region_name': aws_config.region_name,
+            'aws_access_key_id': access_key_id,
+            'aws_secret_access_key': secret_access_key,
+            'region_name': region,
         }
 
         # Create session

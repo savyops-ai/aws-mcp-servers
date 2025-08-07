@@ -23,9 +23,53 @@ from typing import Any, Dict, List
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from cryptography.fernet import Fernet, InvalidToken
 from awslabs.ecs_mcp_server.utils.config import AWSConfig
 
 logger = logging.getLogger(__name__)
+
+
+def get_fernet_key() -> str:
+    """
+    Gets the Fernet key from environment variable or generates a new one.
+
+    Returns:
+        str: The Fernet key
+    """
+    fernet_key = os.getenv("FERNET_KEY")
+    if not fernet_key:
+        raise ValueError("FERNET_KEY environment variable is not set")
+    
+    try:
+        # Validate the Fernet key
+        Fernet(fernet_key.encode())
+    except InvalidToken as e:
+        raise ValueError("Invalid FERNET_KEY provided") from e
+
+    return fernet_key
+
+
+def decrypt_token(token: str) -> str:
+    """
+    Decrypts a token using the Fernet key.
+
+    Args:
+        token (str): The encrypted token to decrypt
+
+    Returns:
+        str: The decrypted plaintext string
+
+    Raises:
+        HTTPException: If decryption fails
+    """
+    fernet_key = get_fernet_key()
+    fernet = Fernet(fernet_key.encode())
+
+    try:
+        decrypted_bytes = fernet.decrypt(token.encode("utf-8"))
+        return decrypted_bytes.decode("utf-8")
+    except InvalidToken as e:
+        raise ValueError("Decryption failure") from e
 
 
 def get_aws_config() -> Config:
@@ -63,8 +107,8 @@ async def get_aws_client(service_name: str, aws_config: AWSConfig):
 
     # Create new client if not in cache
     region = aws_config.region_name
-    access_key_id = aws_config.aws_access_key_id
-    secret_access_key = aws_config.aws_secret_access_key
+    access_key_id = decrypt_token(aws_config.aws_access_key_id)
+    secret_access_key = decrypt_token(aws_config.aws_secret_access_key)
     logger.info(f"Using AWS creds from dict and region: {region}")
 
     client = boto3.client(

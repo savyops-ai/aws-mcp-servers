@@ -17,7 +17,7 @@
 import boto3
 import json
 import os
-from awslabs.cloudwatch_mcp_server.common import AWSConfig
+from awslabs.cloudwatch_mcp_server.common import AWSConfig, decrypt_token
 from awslabs.cloudwatch_mcp_server import MCP_SERVER_VERSION
 from awslabs.cloudwatch_mcp_server.cloudwatch_metrics.models import (
     AlarmRecommendation,
@@ -54,11 +54,15 @@ class CloudWatchMetricsTools:
         """Create a CloudWatch client for the specified region."""
         config = Config(user_agent_extra=f'awslabs/mcp/cloudwatch-mcp-server/{MCP_SERVER_VERSION}')
 
+        region = aws_config.region_name
+        access_key_id = decrypt_token(aws_config.aws_access_key_id)
+        secret_access_key = decrypt_token(aws_config.aws_secret_access_key)
+
         try:
             return boto3.Session(
-                aws_access_key_id=aws_config.aws_access_key_id,
-                aws_secret_access_key=aws_config.aws_secret_access_key,
-                region_name=aws_config.region_name,
+                aws_access_key_id=access_key_id,
+                aws_secret_access_key=secret_access_key,
+                region_name=region,
             ).client(
                 'cloudwatch', config=config
             )

@@ -12,4 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file makes the ecs_mcp_server directory a Python package
+"""awslabs.ecs-mcp-server"""
+
+__version__ = '0.1.0'

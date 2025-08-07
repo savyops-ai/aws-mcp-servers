@@ -6,6 +6,7 @@ services:
     image: ecs-mcp-server:latest
     container_name: ecs-mcp-server
     environment:
+      FERNET_KEY: ${FERNET_KEY}
       FASTMCP_LOG_LEVEL: ${FASTMCP_LOG_LEVEL:-INFO}
       ALLOW_WRITE: ${ALLOW_WRITE:-false}
       ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
@@ -21,6 +22,7 @@ services:
     image: eks-mcp-server:latest
     container_name: eks-mcp-server
     environment:
+      FERNET_KEY: ${FERNET_KEY}
       FASTMCP_LOG_LEVEL: ${FASTMCP_LOG_LEVEL:-INFO}
       ALLOW_WRITE: ${ALLOW_WRITE:-false}
       ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
@@ -35,6 +37,8 @@ services:
       dockerfile: Dockerfile
     image: terraform-mcp-server:latest
     container_name: terraform-mcp-server
+    environment:
+      FASTMCP_LOG_LEVEL: ${FASTMCP_LOG_LEVEL:-INFO}
     ports:
       - 127.0.0.1:9300:9300
     networks:
@@ -47,8 +51,7 @@ services:
   #   image: lambda-mcp-server:latest
   #   container_name: lambda-mcp-server
   #   environment:
-  #     AWS_PROFILE: your-aws-profile
-  #     AWS_REGION: us-east-1
+  #     FERNET_KEY: ${FERNET_KEY}
   #     FUNCTION_PREFIX: your-function-prefix
   #     FUNCTION_LIST: your-first-function, your-second-function
   #     FUNCTION_TAG_KEY: your-tag-key
@@ -68,9 +71,7 @@ services:
   #   image: dynamodb-mcp-server:latest
   #   container_name: dynamodb-mcp-server
   #   environment:
-  #     DDB-MCP-READONLY: "true"
-  #     AWS_PROFILE: default
-  #     AWS_REGION: us-west-2
+  #     FERNET_KEY: ${FERNET_KEY}
   #     FASTMCP_LOG_LEVEL: ERROR
   #     ALLOW_WRITE: ${ALLOW_WRITE:-false}
   #     ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
@@ -86,8 +87,7 @@ services:
     image: elasticache-mcp-server:latest
     container_name: elasticache-mcp-server
     environment:
-      AWS_PROFILE: default
-      AWS_REGION: us-west-2
+      FERNET_KEY: ${FERNET_KEY}
       FASTMCP_LOG_LEVEL: ERROR
       ALLOW_WRITE: ${ALLOW_WRITE:-false}
       ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
@@ -103,6 +103,7 @@ services:
     image: aurora-mcp-server:latest
     container_name: aurora-mcp-server
     environment:
+      FERNET_KEY: ${FERNET_KEY}
       ALLOW_WRITE: ${ALLOW_WRITE:-false}
       ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
     ports:
@@ -117,8 +118,6 @@ services:
     image: mysql-mcp-server:latest
     container_name: mysql-mcp-server
     environment:
-      AWS_PROFILE: your-aws-profile
-      AWS_REGION: us-east-1
       FASTMCP_LOG_LEVEL: ERROR
       ALLOW_WRITE: ${ALLOW_WRITE:-false}
       ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
@@ -134,8 +133,6 @@ services:
     image: postgres-mcp-server:latest
     container_name: postgres-mcp-server
     environment:
-      AWS_PROFILE: your-aws-profile
-      AWS_REGION: us-east-1
       FASTMCP_LOG_LEVEL: ERROR
       ALLOW_WRITE: ${ALLOW_WRITE:-false}
       ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
@@ -151,7 +148,7 @@ services:
     image: cloudwatch-mcp-server:latest
     container_name: cloudwatch-mcp-server
     environment:
-      AWS_PROFILE: your-aws-profile
+      FERNET_KEY: ${FERNET_KEY}
       FASTMCP_LOG_LEVEL: ERROR
       ALLOW_WRITE: ${ALLOW_WRITE:-false}
       ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
@@ -167,8 +164,7 @@ services:
   #   image: aws-serverless-mcp:latest
   #   container_name: aws-serverless-mcp
   #   environment:
-  #     AWS_PROFILE: your-aws-profile
-  #     AWS_REGION: us-east-1
+  #     FERNET_KEY: ${FERNET_KEY}
   #     ALLOW_WRITE: ${ALLOW_WRITE:-false}
   #     ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
   #   ports:

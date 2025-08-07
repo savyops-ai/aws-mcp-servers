@@ -19,19 +19,21 @@ from loguru import logger
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import Field
 from typing import Dict, Optional
+from awslabs.aws_serverless_mcp_server.models import AWSConfig
+from awslabs.aws_serverless_mcp_server.utils.aws_client_helper import get_aws_client
 
 
 class DescribeSchemaTool:
     """DescribeSchemaTool class for describing schemas."""
 
-    def __init__(self, mcp: FastMCP, schemas_client: BaseClient):
+    def __init__(self, mcp: FastMCP):
         """Initialize the DescribeSchemaTool with a FastMCP instance."""
         mcp.tool(name='describe_schema')(self.describe_schema_impl)
-        self.schemas_client = schemas_client
 
     async def describe_schema_impl(
         self,
         ctx: Context,
+        aws_config: AWSConfig,
         registry_name: str = Field(
             description='For AWS service events, use "aws.events" to access the EventBridge schema registry.'
         ),
@@ -85,7 +87,10 @@ class DescribeSchemaTool:
             if schema_version is not None:
                 params['SchemaVersion'] = schema_version
 
-            response = self.schemas_client.describe_schema(**params)
+            schemas_client: BaseClient = get_aws_client(
+                'schemas', aws_config
+            )  # type: ignore[no-untyped-call]
+            response = schemas_client.describe_schema(**params)
             return {
                 'SchemaName': response.get('SchemaName'),
                 'SchemaArn': response.get('SchemaArn'),

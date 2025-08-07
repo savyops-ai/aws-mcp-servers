@@ -50,6 +50,7 @@ from awslabs.aws_serverless_mcp_server.tools.webapps import (
     UpdateFrontendTool,
     WebappDeploymentHelpTool,
 )
+from awslabs.aws_serverless_mcp_server.models import AWSConfig
 from awslabs.aws_serverless_mcp_server.utils.aws_client_helper import get_aws_client
 from awslabs.aws_serverless_mcp_server.utils.const import AWS_REGION, DEPLOYMENT_STATUS_DIR
 from loguru import logger
@@ -200,9 +201,9 @@ def main() -> int:
     SamLocalInvokeTool(mcp)
     SamLogsTool(mcp, args.allow_sensitive_data_access)
 
-    ListRegistriesTool(mcp, schemas_client)
-    SearchSchemaTool(mcp, schemas_client)
-    DescribeSchemaTool(mcp, schemas_client)
+    ListRegistriesTool(mcp)
+    SearchSchemaTool(mcp)
+    DescribeSchemaTool(mcp)
 
     GetMetricsTool(mcp)
     ConfigureDomainTool(mcp, args.allow_write)

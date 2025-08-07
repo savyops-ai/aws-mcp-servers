@@ -19,19 +19,21 @@ from loguru import logger
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import Field
 from typing import Dict, Optional
+from awslabs.aws_serverless_mcp_server.models import AWSConfig
+from awslabs.aws_serverless_mcp_server.utils.aws_client_helper import get_aws_client
 
 
 class ListRegistriesTool:
     """Implementation of the list_registries tool."""
 
-    def __init__(self, mcp: FastMCP, schemas_client: BaseClient):
+    def __init__(self, mcp: FastMCP):
         """Initialize the ListRegistriesTool with a FastMCP instance."""
         mcp.tool(name='list_registries')(self.list_registries_impl)
-        self.schemas_client = schemas_client
 
     async def list_registries_impl(
         self,
         ctx: Context,
+        aws_config: AWSConfig,
         registry_name_prefix: Optional[str] = Field(
             default=None,
             description='Specifying this limits the results to only those registry names that start with the specified prefix. For EventBridge events, use aws.events registry directly instead of searching.',
@@ -81,7 +83,10 @@ class ListRegistriesTool:
             if registry_name_prefix is not None:
                 params['RegistryNamePrefix'] = registry_name_prefix
 
-            response = self.schemas_client.list_registries(**params)
+            schemas_client: BaseClient = get_aws_client(
+                'schemas', aws_config
+            )  # type: ignore[no-untyped-call]
+            response = schemas_client.list_registries(**params)
             return {
                 'Registries': response.get('Registries', []),
                 'NextToken': response.get('NextToken'),

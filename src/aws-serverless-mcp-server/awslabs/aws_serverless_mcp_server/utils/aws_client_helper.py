@@ -14,14 +14,15 @@
 
 import boto3
 from typing import Any, Optional
+from awslabs.aws_serverless_mcp_server.models import AWSConfig
 
 
-def get_aws_client(service_name: str, region: Optional[str]) -> Any:
+def get_aws_client(service_name: str, aws_config: AWSConfig) -> Any:
     """Creates and returns a boto3 client for the specified AWS service.
 
     Args:
         service_name (str): The name of the AWS service (e.g., 's3', 'ec2').
-        region (Optional[str]): The AWS region to use for the client. If None, the default region is used.
+        aws_config (AWSConfig): The AWS configuration containing credentials and region.
 
     Returns:
         object: A boto3 client instance for the specified AWS service.
@@ -30,5 +31,11 @@ def get_aws_client(service_name: str, region: Optional[str]) -> Any:
         - The client is configured with a custom user agent string for identification.
         - Requires valid AWS credentials to be configured in the environment.
     """
-    session = boto3.Session(region_name=region) if region else boto3.Session()
+    session_args = {
+        'aws_access_key_id': aws_config.aws_access_key_id,
+        'aws_secret_access_key': aws_config.aws_secret_access_key,
+    }
+    session = boto3.Session(
+        **session_args, region_name=aws_config.region_name
+    ) if aws_config.region_name else boto3.Session(**session_args)
     return session.client(service_name)

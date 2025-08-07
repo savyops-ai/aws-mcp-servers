@@ -61,6 +61,8 @@ mcp = FastMCP(
         'beautifulsoup4',
         'PyPDF2',
     ],
+    host="0.0.0.0",
+    port="9300",
 )
 
 
@@ -433,7 +435,7 @@ async def terraform_aws_best_practices() -> str:
 
 def main():
     """Run the MCP server with CLI argument support."""
-    mcp.run()
+    mcp.run(transport='sse')
 
 
 if __name__ == '__main__':

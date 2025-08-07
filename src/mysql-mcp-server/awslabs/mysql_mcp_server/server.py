@@ -179,6 +179,8 @@ mcp = FastMCP(
     'awslabs.mysql-mcp-server',
     instructions='You are an expert MySQL assistant. Use run_query and get_table_schema to interfact with the database.',
     dependencies=['loguru', 'boto3', 'pydantic'],
+    host="0.0.0.0",
+    port="9800",
 )
 
 
@@ -364,7 +366,7 @@ def main():
 
     # Run server with appropriate transport
     logger.info('Starting MySQL MCP server')
-    mcp.run()
+    mcp.run(transport='sse')
 
 
 if __name__ == '__main__':

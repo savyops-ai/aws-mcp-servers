@@ -15,94 +15,122 @@
 """AWS helper for the EKS MCP Server."""
 
 import boto3
-import os
 from awslabs.eks_mcp_server import __version__
 from botocore.config import Config
 from loguru import logger
 from typing import Any, Dict, Optional
+from pydantic import BaseModel, Field
+from cryptography.fernet import Fernet, InvalidToken
+
+
+class AWSConfig(BaseModel):
+    """AWS credentials and region/profile configuration."""
+    aws_access_key_id: Optional[str] = Field(..., description="AWS access key ID")
+    aws_secret_access_key: Optional[str] = Field(..., description="AWS secret access key")
+    region_name: str = Field("us-east-1", description="AWS region name, e.g. 'us-east-1'")
+
+
+def get_fernet_key() -> str:
+    """
+    Gets the Fernet key from environment variable or generates a new one.
+
+    Returns:
+        str: The Fernet key
+    """
+    fernet_key = os.getenv("FERNET_KEY")
+    if not fernet_key:
+        raise ValueError("FERNET_KEY environment variable is not set")
+    
+    try:
+        # Validate the Fernet key
+        Fernet(fernet_key.encode())
+    except InvalidToken as e:
+        raise ValueError("Invalid FERNET_KEY provided") from e
+
+    return fernet_key
+
+
+def decrypt_token(token: str) -> str:
+    """
+    Decrypts a token using the Fernet key.
+
+    Args:
+        token (str): The encrypted token to decrypt
+
+    Returns:
+        str: The decrypted plaintext string
+
+    Raises:
+        HTTPException: If decryption fails
+    """
+    fernet_key = get_fernet_key()
+    fernet = Fernet(fernet_key.encode())
+
+    try:
+        decrypted_bytes = fernet.decrypt(token.encode("utf-8"))
+        return decrypted_bytes.decode("utf-8")
+    except InvalidToken as e:
+        raise ValueError("Decryption failure") from e
 
 
 class AwsHelper:
-    """Helper class for AWS operations.
+    """Helper for creating AWS service clients using AWSConfig."""
 
-    This class provides utility methods for interacting with AWS services,
-    including region and profile management and client creation.
-
-    This class implements a singleton pattern with a client cache to avoid
-    creating multiple clients for the same service.
-    """
-
-    # Singleton instance
-    _instance = None
-
-    # Client cache with AWS service name as key
     _client_cache: Dict[str, Any] = {}
 
     @staticmethod
-    def get_aws_region() -> Optional[str]:
-        """Get the AWS region from the environment if set."""
-        return os.environ.get('AWS_REGION')
-
-    @staticmethod
-    def get_aws_profile() -> Optional[str]:
-        """Get the AWS profile from the environment if set."""
-        return os.environ.get('AWS_PROFILE')
+    def _cache_key(service_name: str, config: AWSConfig) -> str:
+        # include region in cache key
+        return f"{service_name}:{config.region_name}"
 
     @classmethod
-    def create_boto3_client(cls, service_name: str, region_name: Optional[str] = None) -> Any:
-        """Create or retrieve a cached boto3 client with the appropriate profile and region.
-
-        The client is configured with a custom user agent suffix 'awslabs/mcp/eks-mcp-server/{version}'
-        to identify API calls made by the EKS MCP Server. Clients are cached to improve performance
-        and reduce resource usage.
+    def create_boto3_client(
+        cls,
+        service_name: str,
+        aws_config: AWSConfig,
+    ) -> Any:
+        """
+        Create or retrieve a cached boto3 client for the given service, using the provided AWSConfig.
 
         Args:
-            service_name: The AWS service name (e.g., 'ec2', 's3', 'eks')
-            region_name: Optional region name override
+            service_name: AWS service name (e.g. 'ec2', 's3', 'eks')
+            aws_config: AWSConfig object with credentials and region
 
         Returns:
-            A boto3 client for the specified service
-
-        Raises:
-            Exception: If there's an error creating the client
+            boto3 client
         """
+        if aws_config is None:
+            raise ValueError("AWSConfig must be provided to create_client")
+
+        key = cls._cache_key(service_name, aws_config)
+        if key in cls._client_cache:
+            logger.info(f"Using cached boto3 client for {service_name} (key={key})")
+            return cls._client_cache[key]
+        
+        region = aws_config.region_name
+        access_key_id = decrypt_token(aws_config.aws_access_key_id)
+        secret_access_key = decrypt_token(aws_config.aws_secret_access_key)
+
+        # Build session parameters
+        session_kwargs: Dict[str, Any] = {
+            'aws_access_key_id': access_key_id,
+            'aws_secret_access_key': secret_access_key,
+            'region_name': region,
+        }
+
+        # Create session
+        session = boto3.Session(**session_kwargs)
+
+        # Configure user agent suffix
+        config = Config(user_agent_extra=f"awslabs/mcp/eks-mcp-server/{__version__}")
+
+        # Create client
         try:
-            # Get region from parameter or environment if set
-            region: Optional[str] = (
-                region_name if region_name is not None else cls.get_aws_region()
-            )
-
-            # Get profile from environment if set
-            profile = cls.get_aws_profile()
-
-            # Use service name as the cache key
-            cache_key = service_name
-
-            # Check if client is already in cache
-            if cache_key in cls._client_cache:
-                logger.info(f'Using cached boto3 client for {service_name}')
-                return cls._client_cache[cache_key]
-
-            # Create config with user agent suffix
-            config = Config(user_agent_extra=f'awslabs/mcp/eks-mcp-server/{__version__}')
-
-            # Create session with profile if specified
-            if profile:
-                session = boto3.Session(profile_name=profile)
-                if region is not None:
-                    client = session.client(service_name, region_name=region, config=config)
-                else:
-                    client = session.client(service_name, config=config)
-            else:
-                if region is not None:
-                    client = boto3.client(service_name, region_name=region, config=config)
-                else:
-                    client = boto3.client(service_name, config=config)
-
-            # Cache the client
-            cls._client_cache[cache_key] = client
-
-            return client
+            client = session.client(service_name, config=config)
         except Exception as e:
-            # Re-raise with more context
-            raise Exception(f'Failed to create boto3 client for {service_name}: {str(e)}')
+            raise Exception(f"Failed to create boto3 client for {service_name}: {e}")
+
+        # Cache and return
+        cls._client_cache[key] = client
+        logger.info(f"Created new boto3 client for {service_name} (key={key})")
+        return client

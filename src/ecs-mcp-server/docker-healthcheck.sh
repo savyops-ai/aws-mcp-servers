@@ -1,3 +1,4 @@
+#!/bin/sh
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,21 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Common MCP server configuration."""
+SERVER="ecs-mcp-server"
 
-from mcp.server.fastmcp import FastMCP
+# Check if the server process is running
+if pgrep -P 0 -a -l -x -f "/app/.venv/bin/python3 /app/.venv/bin/awslabs.$SERVER" > /dev/null; then
+  echo -n "$SERVER is running";
+  exit 0;
+fi;
 
-
-mcp = FastMCP(
-    'awslabs.elasticache-mcp-server',
-    instructions="""AWS ElastiCache MCP Server provides tools for interacting with Amazon ElastiCache.
-    These tools allow you to describe and manage serverless caches in your AWS account.
-    You can use these capabilities to get information about cache configurations, endpoints, and more.""",
-    dependencies=[
-        'pydantic',
-        'loguru',
-        'boto3',
-    ],
-    host="0.0.0.0",
-    port="9600",
-)
+# Unhealthy
+exit 1;

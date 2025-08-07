@@ -19,6 +19,8 @@ from loguru import logger
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import Field
 from typing import Dict, Optional
+from awslabs.aws_serverless_mcp_server.models import AWSConfig
+from awslabs.aws_serverless_mcp_server.utils.aws_client_helper import get_aws_client
 
 
 class SearchSchemaTool:
@@ -29,14 +31,14 @@ class SearchSchemaTool:
     that consume events from EventBridge.
     """
 
-    def __init__(self, mcp: FastMCP, schemas_client: BaseClient):
+    def __init__(self, mcp: FastMCP):
         """Initialize the SearchSchemaTool with a FastMCP instance."""
         mcp.tool(name='search_schema')(self.search_schema_impl)
-        self.schemas_client = schemas_client
 
     async def search_schema_impl(
         self,
         ctx: Context,
+        aws_config: AWSConfig,
         keywords: str = Field(
             description='Keywords to search for. Prefix service names with "aws." for better results (e.g., "aws.s3" for S3 events, "aws.ec2" for EC2 events).'
         ),
@@ -88,7 +90,10 @@ class SearchSchemaTool:
             if next_token is not None:
                 params['NextToken'] = next_token
 
-            response = self.schemas_client.search_schemas(**params)
+            schemas_client: BaseClient = get_aws_client(
+                'schemas', aws_config
+            )  # type: ignore[no-untyped-call]
+            response = schemas_client.search_schemas(**params)
             return {
                 'Schemas': response.get('Schemas', []),
                 'NextToken': response.get('NextToken'),

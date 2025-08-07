@@ -78,3 +78,9 @@ class DeployWebAppRequest(BaseModel):
     frontend_configuration: Optional[FrontendConfiguration] = Field(
         None, description='Frontend configuration'
     )
+
+
+class AWSConfig(BaseModel):
+    aws_access_key_id: str = Field(..., description="AWS access key ID")
+    aws_secret_access_key: str = Field(..., description="AWS secret access key")
+    region_name: Optional[str] = Field(None, description="AWS region name, e.g. 'us-east-1'")

@@ -23,8 +23,53 @@ from typing import Any, Dict, List
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from cryptography.fernet import Fernet, InvalidToken
+from awslabs.ecs_mcp_server.utils.config import AWSConfig
 
 logger = logging.getLogger(__name__)
+
+
+def get_fernet_key() -> str:
+    """
+    Gets the Fernet key from environment variable or generates a new one.
+
+    Returns:
+        str: The Fernet key
+    """
+    fernet_key = os.getenv("FERNET_KEY")
+    if not fernet_key:
+        raise ValueError("FERNET_KEY environment variable is not set")
+    
+    try:
+        # Validate the Fernet key
+        Fernet(fernet_key.encode())
+    except InvalidToken as e:
+        raise ValueError("Invalid FERNET_KEY provided") from e
+
+    return fernet_key
+
+
+def decrypt_token(token: str) -> str:
+    """
+    Decrypts a token using the Fernet key.
+
+    Args:
+        token (str): The encrypted token to decrypt
+
+    Returns:
+        str: The decrypted plaintext string
+
+    Raises:
+        HTTPException: If decryption fails
+    """
+    fernet_key = get_fernet_key()
+    fernet = Fernet(fernet_key.encode())
+
+    try:
+        decrypted_bytes = fernet.decrypt(token.encode("utf-8"))
+        return decrypted_bytes.decode("utf-8")
+    except InvalidToken as e:
+        raise ValueError("Decryption failure") from e
 
 
 def get_aws_config() -> Config:
@@ -41,7 +86,7 @@ def get_aws_config() -> Config:
 _aws_clients = {}
 
 
-async def get_aws_client(service_name: str):
+async def get_aws_client(service_name: str, aws_config: AWSConfig):
     """
     Gets an AWS service client.
 
@@ -49,6 +94,8 @@ async def get_aws_client(service_name: str):
     ----------
     service_name : str
         The name of the AWS service (e.g., 'ecs', 's3', 'ec2')
+    aws_config : AWSConfig
+        AWS configuration containing credentials and region
 
     Returns
     -------
@@ -59,11 +106,17 @@ async def get_aws_client(service_name: str):
         return _aws_clients[service_name]
 
     # Create new client if not in cache
-    region = os.environ.get("AWS_REGION", "us-east-1")
-    profile = os.environ.get("AWS_PROFILE", "default")
-    logger.info(f"Using AWS profile: {profile} and region: {region}")
+    region = aws_config.region_name
+    access_key_id = decrypt_token(aws_config.aws_access_key_id)
+    secret_access_key = decrypt_token(aws_config.aws_secret_access_key)
+    logger.info(f"Using AWS creds from dict and region: {region}")
 
-    client = boto3.client(service_name, region_name=region, config=get_aws_config())
+    client = boto3.client(
+        service_name, 
+        region_name=region,
+        aws_access_key_id=access_key_id,
+        aws_secret_access_key=secret_access_key
+    )
 
     # Cache the client for reuse
     _aws_clients[service_name] = client
@@ -78,12 +131,14 @@ async def get_aws_account_id() -> str:
     return response["Account"]
 
 
-async def get_default_vpc_and_subnets(ec2_client=None) -> Dict[str, Any]:
+async def get_default_vpc_and_subnets(aws_config: AWSConfig, ec2_client=None) -> Dict[str, Any]:
     """
     Gets the default VPC and subnets.
 
     Parameters
     ----------
+    aws_config : AWSConfig
+        AWS configuration containing credentials and region
     ec2_client : boto3.client, optional
         EC2 client to use. If not provided, a new client will be created.
 
@@ -92,7 +147,7 @@ async def get_default_vpc_and_subnets(ec2_client=None) -> Dict[str, Any]:
     Dict[str, Any]
         Dictionary containing VPC ID, subnet IDs, and route table IDs
     """
-    ec2 = ec2_client or await get_aws_client("ec2")
+    ec2 = ec2_client or await get_aws_client(aws_config, "ec2")
 
     # Get default VPC
     vpcs = ec2.describe_vpcs(Filters=[{"Name": "isDefault", "Values": ["true"]}])  # Removed await
@@ -139,9 +194,9 @@ async def get_default_vpc_and_subnets(ec2_client=None) -> Dict[str, Any]:
     return {"vpc_id": vpc_id, "subnet_ids": subnet_ids, "route_table_ids": route_table_ids}
 
 
-async def create_ecr_repository(repository_name: str) -> Dict[str, Any]:
+async def create_ecr_repository(repository_name: str, aws_config: AWSConfig) -> Dict[str, Any]:
     """Creates an ECR repository if it doesn't exist."""
-    ecr = await get_aws_client("ecr")
+    ecr = await get_aws_client("ecr", aws_config)
 
     try:
         # Check if repository exists
@@ -162,7 +217,7 @@ async def create_ecr_repository(repository_name: str) -> Dict[str, Any]:
             raise
 
 
-async def assume_ecr_role(role_arn: str) -> Dict[str, Any]:
+async def assume_ecr_role(role_arn: str, aws_config: AWSConfig) -> Dict[str, Any]:
     """
     Assumes the ECR push/pull role.
 
@@ -172,7 +227,7 @@ async def assume_ecr_role(role_arn: str) -> Dict[str, Any]:
     Returns:
         Dict containing temporary credentials
     """
-    sts = await get_aws_client("sts")
+    sts = await get_aws_client("sts", aws_config)
 
     logger.info(f"Assuming role: {role_arn}")
     response = sts.assume_role(RoleArn=role_arn, RoleSessionName="ECSMCPServerECRSession")
@@ -184,7 +239,7 @@ async def assume_ecr_role(role_arn: str) -> Dict[str, Any]:
     }
 
 
-async def get_aws_client_with_role(service_name: str, role_arn: str):
+async def get_aws_client_with_role(service_name: str, role_arn: str, aws_config: AWSConfig) -> Any:
     """
     Gets an AWS service client using a specific role.
 
@@ -195,8 +250,8 @@ async def get_aws_client_with_role(service_name: str, role_arn: str):
     Returns:
         AWS service client with role credentials
     """
-    credentials = await assume_ecr_role(role_arn)
-    region = os.environ.get("AWS_REGION", "us-east-1")
+    credentials = await assume_ecr_role(role_arn, aws_config)
+    region = aws_config.region_name
 
     logger.info(f"Creating {service_name} client with assumed role: {role_arn}")
     return boto3.client(
@@ -209,12 +264,13 @@ async def get_aws_client_with_role(service_name: str, role_arn: str):
     )
 
 
-async def get_ecr_login_password(role_arn: str) -> str:
+async def get_ecr_login_password(role_arn: str, aws_config: AWSConfig) -> str:
     """
     Gets ECR login password for Docker authentication.
 
     Args:
         role_arn: ARN of the ECR push/pull role to use
+        aws_config: AWS configuration containing credentials and region
 
     Returns:
         ECR login password for Docker authentication
@@ -225,7 +281,7 @@ async def get_ecr_login_password(role_arn: str) -> str:
     if not role_arn:
         raise ValueError("role_arn is required for ECR authentication")
 
-    ecr = await get_aws_client_with_role("ecr", role_arn)
+    ecr = await get_aws_client_with_role("ecr", role_arn, aws_config)
     logger.info(f"Getting ECR login password using role: {role_arn}")
 
     response = ecr.get_authorization_token()  # Removed await
@@ -245,7 +301,7 @@ async def get_ecr_login_password(role_arn: str) -> str:
     return password
 
 
-async def get_route_tables_for_vpc(vpc_id: str, ec2_client=None) -> List[str]:
+async def get_route_tables_for_vpc(vpc_id: str, aws_config: AWSConfig, ec2_client=None) -> List[str]:
     """
     Gets route tables for a specific VPC.
 
@@ -255,13 +311,15 @@ async def get_route_tables_for_vpc(vpc_id: str, ec2_client=None) -> List[str]:
         ID of the VPC to get route tables for
     ec2_client : boto3.client, optional
         EC2 client to use. If not provided, a new client will be created.
+    aws_config : AWSConfig
+        AWS configuration containing credentials and region
 
     Returns
     -------
     List[str]
         List of route table IDs
     """
-    ec2 = ec2_client or await get_aws_client("ec2")
+    ec2 = ec2_client or await get_aws_client("ec2", aws_config)
 
     # Get route tables for the VPC
     route_tables = ec2.describe_route_tables(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])

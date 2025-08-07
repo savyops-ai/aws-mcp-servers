@@ -50,6 +50,7 @@ from awslabs.aws_serverless_mcp_server.tools.webapps import (
     UpdateFrontendTool,
     WebappDeploymentHelpTool,
 )
+from awslabs.aws_serverless_mcp_server.models import AWSConfig
 from awslabs.aws_serverless_mcp_server.utils.aws_client_helper import get_aws_client
 from awslabs.aws_serverless_mcp_server.utils.const import AWS_REGION, DEPLOYMENT_STATUS_DIR
 from loguru import logger
@@ -97,6 +98,8 @@ mcp = FastMCP(
     4. Install AWS CLI and SAM CLI
     """,
     dependencies=['pydantic', 'boto3', 'loguru'],
+    host="0.0.0.0",
+    port="10100",
 )
 
 
@@ -200,9 +203,9 @@ def main() -> int:
     SamLocalInvokeTool(mcp)
     SamLogsTool(mcp, args.allow_sensitive_data_access)
 
-    ListRegistriesTool(mcp, schemas_client)
-    SearchSchemaTool(mcp, schemas_client)
-    DescribeSchemaTool(mcp, schemas_client)
+    ListRegistriesTool(mcp)
+    SearchSchemaTool(mcp)
+    DescribeSchemaTool(mcp)
 
     GetMetricsTool(mcp)
     ConfigureDomainTool(mcp, args.allow_write)
@@ -221,7 +224,7 @@ def main() -> int:
 
     try:
         logger.info(f'Starting AWS Serverless MCP Server in {", ".join(mode_info)}')
-        mcp.run()
+        mcp.run(transport='sse')
         return 0
     except Exception as e:
         logger.error(f'Error starting AWS Serverless MCP Server: {e}')

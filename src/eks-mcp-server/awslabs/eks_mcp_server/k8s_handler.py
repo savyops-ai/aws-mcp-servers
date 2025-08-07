@@ -17,6 +17,7 @@
 import os
 import yaml
 from awslabs.eks_mcp_server.k8s_apis import K8sApis
+from awslabs.eks_mcp_server.aws_helper import AWSConfig
 from awslabs.eks_mcp_server.k8s_client_cache import K8sClientCache
 from awslabs.eks_mcp_server.logging_helper import LogLevel, log_with_request_id
 from awslabs.eks_mcp_server.models import (
@@ -71,11 +72,12 @@ class K8sHandler:
         self.mcp.tool(name='apply_yaml')(self.apply_yaml)
         self.mcp.tool(name='generate_app_manifest')(self.generate_app_manifest)
 
-    def get_client(self, cluster_name: str) -> K8sApis:
+    def get_client(self, cluster_name: str, aws_config: AWSConfig) -> K8sApis:
         """Get a Kubernetes client for the specified cluster.
 
         Args:
             cluster_name: Name of the EKS cluster
+            aws_config: AWS configuration containing credentials and region
 
         Returns:
             K8sApis instance
@@ -84,11 +86,12 @@ class K8sHandler:
             ValueError: If the cluster credentials are invalid
             Exception: If there's an error getting the cluster credentials
         """
-        return self.client_cache.get_client(cluster_name)
+        return self.client_cache.get_client(cluster_name, aws_config)
 
     async def apply_yaml(
         self,
         ctx: Context,
+        aws_config: AWSConfig,
         yaml_path: str = Field(
             ...,
             description="""Absolute path to the YAML file to apply.
@@ -132,6 +135,7 @@ class K8sHandler:
             cluster_name: Name of the EKS cluster
             namespace: Default namespace to use for resources
             force: Whether to update resources if they already exist (like kubectl apply)
+            aws_config: AWS configuration containing credentials and region
 
         Returns:
             ApplyYamlResponse with operation result
@@ -150,7 +154,7 @@ class K8sHandler:
                 )
 
             # Get Kubernetes client for the cluster
-            k8s_client = self.get_client(cluster_name)
+            k8s_client = self.get_client(cluster_name, aws_config)
 
             # Read the YAML content from the local file
             log_with_request_id(ctx, LogLevel.INFO, f'Reading YAML content from file: {yaml_path}')
@@ -293,6 +297,7 @@ class K8sHandler:
     async def manage_k8s_resource(
         self,
         ctx: Context,
+        aws_config: AWSConfig,
         operation: str = Field(
             ...,
             description="""Operation to perform on the resource. Valid values:
@@ -369,6 +374,7 @@ class K8sHandler:
             name: Name of the Kubernetes resource
             namespace: Namespace of the Kubernetes resource (optional)
             body: Resource definition
+            aws_config: AWS configuration containing credentials and region
 
         Returns:
             KubernetesResourceResponse with operation result
@@ -429,7 +435,7 @@ class K8sHandler:
                 )
 
             # Get Kubernetes client for the cluster
-            k8s_client = self.get_client(cluster_name)
+            k8s_client = self.get_client(cluster_name, aws_config)
 
             # Call the manage_resource method
             response = k8s_client.manage_resource(
@@ -505,6 +511,7 @@ class K8sHandler:
     async def list_k8s_resources(
         self,
         ctx: Context,
+        aws_config: AWSConfig,
         cluster_name: str = Field(
             ..., description='Name of the EKS cluster where the resources are located.'
         ),
@@ -562,13 +569,14 @@ class K8sHandler:
             namespace: Namespace of the Kubernetes resources (optional)
             label_selector: Label selector to filter resources (optional)
             field_selector: Field selector to filter resources (optional)
+            aws_config: AWS configuration containing credentials and region
 
         Returns:
             KubernetesResourceListResponse with operation result
         """
         try:
             # Get Kubernetes client for the cluster
-            k8s_client = self.get_client(cluster_name)
+            k8s_client = self.get_client(cluster_name, aws_config)
 
             # List resources
             response = k8s_client.list_resources(
@@ -857,6 +865,7 @@ class K8sHandler:
     async def get_pod_logs(
         self,
         ctx: Context,
+        aws_config: AWSConfig,
         cluster_name: str = Field(
             ..., description='Name of the EKS cluster where the pod is running.'
         ),
@@ -905,6 +914,7 @@ class K8sHandler:
             since_seconds: Only return logs newer than this many seconds (optional)
             tail_lines: Number of lines to return from the end of the logs (defaults to 100)
             limit_bytes: Maximum number of bytes to return (defaults to 10KB)
+            aws_config: AWS configuration containing credentials and region
 
         Returns:
             PodLogsResponse with pod logs
@@ -924,7 +934,7 @@ class K8sHandler:
 
         try:
             # Get Kubernetes client for the cluster
-            k8s_client = self.get_client(cluster_name)
+            k8s_client = self.get_client(cluster_name, aws_config)
 
             # Get pod logs
             logs = k8s_client.get_pod_logs(
@@ -991,6 +1001,7 @@ class K8sHandler:
     async def get_k8s_events(
         self,
         ctx: Context,
+        aws_config: AWSConfig,
         cluster_name: str = Field(
             ..., description='Name of the EKS cluster where the resource is located.'
         ),
@@ -1034,6 +1045,7 @@ class K8sHandler:
             kind: Kind of the involved object
             name: Name of the involved object
             namespace: Namespace of the involved object (optional for non-namespaced resources)
+            aws_config: AWS configuration containing credentials and region
 
         Returns:
             EventsResponse with events related to the specified object
@@ -1054,7 +1066,7 @@ class K8sHandler:
 
         try:
             # Get Kubernetes client for the cluster
-            k8s_client = self.get_client(cluster_name)
+            k8s_client = self.get_client(cluster_name, aws_config)
 
             # Get events
             events = k8s_client.get_events(
@@ -1128,6 +1140,7 @@ class K8sHandler:
     async def list_api_versions(
         self,
         ctx: Context,
+        aws_config: AWSConfig,
         cluster_name: str = Field(
             ..., description='Name of the EKS cluster to query for available API versions.'
         ),
@@ -1153,13 +1166,14 @@ class K8sHandler:
         Args:
             ctx: MCP context
             cluster_name: Name of the EKS cluster
+            aws_config: AWS configuration containing credentials and region
 
         Returns:
             ApiVersionsResponse with list of available API versions
         """
         try:
             # Get Kubernetes client for the cluster
-            k8s_client = self.get_client(cluster_name)
+            k8s_client = self.get_client(cluster_name, aws_config)
 
             # Get API versions from the cluster (excluding core APIs)
             api_versions = k8s_client.get_api_versions()

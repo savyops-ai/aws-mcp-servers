@@ -19,8 +19,16 @@ Configuration utilities for the ECS MCP Server.
 import logging
 import os
 from typing import Any, Dict
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+
+class AWSConfig(BaseModel):
+    """AWS credentials and region for creating clients."""
+    aws_access_key_id: str = Field(..., description="AWS access key ID")
+    aws_secret_access_key: str = Field(..., description="AWS secret access key")
+    region_name: str = Field("us-east-1", description="AWS region to query. Defaults to us-east-1.")
 
 
 def get_config() -> Dict[str, Any]:

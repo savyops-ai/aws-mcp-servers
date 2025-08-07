@@ -101,6 +101,8 @@ def create_server():
         'awslabs.eks-mcp-server',
         instructions=SERVER_INSTRUCTIONS,
         dependencies=SERVER_DEPENDENCIES,
+        host="0.0.0.0",
+        port="9200",
     )
 
 
@@ -151,7 +153,7 @@ def main():
     CloudWatchMetricsHandler(mcp)
 
     # Run server
-    mcp.run()
+    mcp.run(transport='sse')
 
     return mcp
 

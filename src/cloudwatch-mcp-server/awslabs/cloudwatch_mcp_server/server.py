@@ -28,6 +28,8 @@ mcp = FastMCP(
         'pydantic',
         'loguru',
     ],
+    host="0.0.0.0",
+    port="10000",
 )
 
 # Initialize and register CloudWatch tools
@@ -48,7 +50,7 @@ except Exception as e:
 
 def main():
     """Run the MCP server."""
-    mcp.run()
+    mcp.run(transport='sse')
     logger.info('CloudWatch MCP server started')
 
 

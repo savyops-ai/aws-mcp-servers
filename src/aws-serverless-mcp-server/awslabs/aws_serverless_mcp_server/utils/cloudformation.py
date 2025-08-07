@@ -12,23 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from awslabs.aws_serverless_mcp_server.models import AWSConfig
 from awslabs.aws_serverless_mcp_server.utils.aws_client_helper import get_aws_client
 from loguru import logger
 from typing import Any, Dict, Optional
 
 
-async def get_stack_info(stack_name: str, region: Optional[str] = None) -> Dict[str, Any]:
+async def get_stack_info(stack_name: str, aws_config: AWSConfig) -> Dict[str, Any]:
     """Get information about a CloudFormation stack.
 
     Args:
         stack_name: Name of the CloudFormation stack
-        region: AWS region
+        aws_config: AWS configuration containing credentials and region
 
     Returns:
         Dict: Stack information including status, outputs, etc.
     """
     # Initialize CloudFormation client
-    cf_client = get_aws_client('cloudformation', region)
+    cf_client = get_aws_client('cloudformation', aws_config)
 
     try:
         # Get stack information

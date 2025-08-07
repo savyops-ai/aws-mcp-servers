@@ -15,7 +15,7 @@
 """IAM handler for the EKS MCP Server."""
 
 import json
-from awslabs.eks_mcp_server.aws_helper import AwsHelper
+from awslabs.eks_mcp_server.aws_helper import AwsHelper, AWSConfig
 from awslabs.eks_mcp_server.logging_helper import LogLevel, log_with_request_id
 from awslabs.eks_mcp_server.models import (
     AddInlinePolicyResponse,
@@ -53,6 +53,7 @@ class IAMHandler:
     async def get_policies_for_role(
         self,
         ctx: Context,
+        aws_config: AWSConfig,
         role_name: str = Field(
             ...,
             description='Name of the IAM role to get policies for. The role must exist in your AWS account.',
@@ -86,6 +87,7 @@ class IAMHandler:
         Args:
             ctx: The MCP context
             role_name: Name of the IAM role to get policies for
+            aws_config: AWS configuration containing credentials and region
 
         Returns:
             RoleDescriptionResponse: Detailed information about the role's policies
@@ -94,7 +96,7 @@ class IAMHandler:
             log_with_request_id(ctx, LogLevel.INFO, f'Describing IAM role: {role_name}')
 
             # Get IAM client
-            iam_client = AwsHelper.create_boto3_client('iam')
+            iam_client = AwsHelper.create_boto3_client('iam', aws_config=aws_config)
 
             # Get role details
             role_response = iam_client.get_role(RoleName=role_name)
@@ -145,6 +147,7 @@ class IAMHandler:
     async def add_inline_policy(
         self,
         ctx: Context,
+        aws_config: AWSConfig,
         policy_name: str = Field(
             ..., description='Name of the inline policy to create. Must be unique within the role.'
         ),
@@ -213,7 +216,7 @@ class IAMHandler:
                 )
 
             # Get IAM client
-            iam_client = AwsHelper.create_boto3_client('iam')
+            iam_client = AwsHelper.create_boto3_client('iam', aws_config=aws_config)
 
             # Create the inline policy
             return self._create_inline_policy(ctx, iam_client, role_name, policy_name, permissions)

@@ -101,6 +101,8 @@ IMPORTANT:
 - Set ALLOW_WRITE=true to enable infrastructure creation and deletion
 - Set ALLOW_SENSITIVE_DATA=true to enable access to logs and detailed resource information
 """,
+    host="0.0.0.0",
+    port="9100",
 )
 
 # Apply security wrappers to API functions
@@ -128,7 +130,7 @@ def main() -> None:
         logger.info("Server started")
         logger.info(f"Write operations enabled: {config.get('allow-write', False)}")
         logger.info(f"Sensitive data access enabled: {config.get('allow-sensitive-data', False)}")
-        mcp.run()
+        mcp.run(transport='sse')
     except KeyboardInterrupt:
         logger.info("Server stopped by user")
         sys.exit(0)

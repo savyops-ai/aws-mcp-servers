@@ -31,6 +31,7 @@ dependencies = [
     "pytest-cov>=6.1.1",
     "pyright>=1.1.401",
     "ruff>=0.11.11",
+    "cryptography>=45.0.5",
 ]
 
 [project.optional-dependencies]
@@ -49,7 +50,7 @@ Documentation = "https://awslabs.github.io/mcp/servers/ecs-mcp-server/"
 Issues = "https://github.com/awslabs/mcp/issues"
 
 [project.scripts]
-ecs-mcp-server = "awslabs.ecs_mcp_server.main:main"
+"awslabs.ecs-mcp-server" = "awslabs.ecs_mcp_server.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["awslabs"]

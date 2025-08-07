@@ -46,13 +46,7 @@ from awslabs.aurora_dsql_mcp_server.mutable_sql_detector import (
 class AWSConfig(BaseModel):
     aws_access_key_id: str = Field(..., description="AWS access key ID")
     aws_secret_access_key: str = Field(..., description="AWS secret access key")
-    region_name: str = Field(..., description="AWS region, e.g. 'us-east-1'")
-
-    @validator("region_name")
-    def validate_region(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("region_name must be non-empty")
-        return v
+    region_name: str = Field("us-east-1", description="AWS region")
 
 # Global connection state
 cluster_endpoint: str = ''
@@ -309,9 +303,6 @@ def main():
     cluster_endpoint = args.cluster_endpoint
     database_user = args.database_user
     read_only = not args.allow_writes
-
-    # validate AWSConfig but do not create global client here
-    aws_conf = AWSConfig.parse_raw(args.aws_config)
 
     # verify connectivity
     try:

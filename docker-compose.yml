@@ -1,18 +1,18 @@
 services:
-  # ecs_mcp_server:
-  #   build:
-  #     context: src/ecs-mcp-server
-  #     dockerfile: Dockerfile
-  #   image: ecs-mcp-server:latest
-  #   container_name: ecs-mcp-server
-  #   environment:
-  #     FASTMCP_LOG_LEVEL: ${FASTMCP_LOG_LEVEL:-INFO}
-  #     ALLOW_WRITE: ${ALLOW_WRITE:-false}
-  #     ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
-  #   ports:
-  #     - 127.0.0.1:9100:9100
-  #   networks:
-  #     - mcp-servers-network
+  ecs_mcp_server:
+    build:
+      context: src/ecs-mcp-server
+      dockerfile: Dockerfile
+    image: ecs-mcp-server:latest
+    container_name: ecs-mcp-server
+    environment:
+      FASTMCP_LOG_LEVEL: ${FASTMCP_LOG_LEVEL:-INFO}
+      ALLOW_WRITE: ${ALLOW_WRITE:-false}
+      ALLOW_SENSITIVE_DATA: ${ALLOW_SENSITIVE_DATA:-false}
+    ports:
+      - 127.0.0.1:9100:9100
+    networks:
+      - mcp-servers-network
 
   eks_mcp_server:
     build:

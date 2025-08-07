@@ -16,7 +16,7 @@
 
 import os
 import yaml
-from awslabs.eks_mcp_server.aws_helper import AwsHelper
+from awslabs.eks_mcp_server.aws_helper import AwsHelper, AWSConfig
 from awslabs.eks_mcp_server.consts import (
     CFN_CAPABILITY_IAM,
     CFN_ON_FAILURE_DELETE,
@@ -63,7 +63,7 @@ class EksStackHandler:
         self.mcp.tool(name='manage_eks_stacks')(self.manage_eks_stacks)
 
     def _ensure_stack_ownership(
-        self, ctx: Context, stack_name: str, operation: str
+        self, ctx: Context, aws_config: AWSConfig, stack_name: str, operation: str
     ) -> Tuple[bool, Optional[Dict], Optional[str]]:
         """Ensure that a stack exists and was created by this tool.
 
@@ -71,6 +71,7 @@ class EksStackHandler:
             ctx: The MCP context
             stack_name: Name of the stack to verify
             operation: Operation being performed (for error messages)
+            aws_config: AWS configuration containing credentials and region
 
         Returns:
             Tuple of (success, stack_details, error_message)
@@ -80,7 +81,7 @@ class EksStackHandler:
         """
         try:
             # Create CloudFormation client
-            cfn_client = AwsHelper.create_boto3_client('cloudformation')
+            cfn_client = AwsHelper.create_boto3_client('cloudformation', aws_config=aws_config)
 
             # Get stack details
             stack_details = cfn_client.describe_stacks(StackName=stack_name)
@@ -114,6 +115,7 @@ class EksStackHandler:
     async def manage_eks_stacks(
         self,
         ctx: Context,
+        aws_config: AWSConfig,
         operation: str = Field(
             ...,
             description='Operation to perform: generate, deploy, describe, or delete. Choose "describe" for read-only operations when write access is disabled.',
@@ -175,6 +177,7 @@ class EksStackHandler:
             operation: Operation to perform (generate, deploy, describe, or delete)
             template_file: Absolute path for the CloudFormation template (for generate and deploy operations)
             cluster_name: Name of the EKS cluster (for all operations)
+            aws_config: AWS configuration containing credentials and region
 
         Returns:
             Union[GenerateTemplateResponse, DeployStackResponse, DescribeStackResponse, DeleteStackResponse]:
@@ -242,6 +245,7 @@ class EksStackHandler:
                 stack_name = CFN_STACK_NAME_TEMPLATE.format(cluster_name=cluster_name)
                 return await self._deploy_stack(
                     ctx=ctx,
+                    aws_config=aws_config,
                     template_file=template_file,
                     stack_name=stack_name,
                     cluster_name=cluster_name,
@@ -264,7 +268,7 @@ class EksStackHandler:
                 # Derive stack name from cluster name
                 stack_name = CFN_STACK_NAME_TEMPLATE.format(cluster_name=cluster_name)
                 return await self._delete_stack(
-                    ctx=ctx, stack_name=stack_name, cluster_name=cluster_name
+                    ctx=ctx, aws_config=aws_config, stack_name=stack_name, cluster_name=cluster_name
                 )
 
             else:
@@ -375,12 +379,12 @@ class EksStackHandler:
             )
 
     async def _deploy_stack(
-        self, ctx: Context, template_file: str, stack_name: str, cluster_name: str
+        self, ctx: Context, aws_config: AWSConfig, template_file: str, stack_name: str, cluster_name: str
     ) -> DeployStackResponse:
         """Deploy a CloudFormation stack from the specified template file."""
         try:
             # Create CloudFormation client
-            cfn_client = AwsHelper.create_boto3_client('cloudformation')
+            cfn_client = AwsHelper.create_boto3_client('cloudformation', aws_config=aws_config)
 
             # Read the template
             with open(template_file, 'r') as template_file_obj:
@@ -390,7 +394,7 @@ class EksStackHandler:
             stack_exists = False
             try:
                 success, stack, error_message = self._ensure_stack_ownership(
-                    ctx, stack_name, 'update'
+                    ctx, aws_config, stack_name, 'update'
                 )
                 if stack:
                     stack_exists = True
@@ -580,12 +584,12 @@ class EksStackHandler:
                     del resource['Metadata']
 
     async def _delete_stack(
-        self, ctx: Context, stack_name: str, cluster_name: str
+        self, ctx: Context, aws_config: AWSConfig, stack_name: str, cluster_name: str
     ) -> DeleteStackResponse:
         """Delete a CloudFormation stack."""
         try:
             # Create CloudFormation client
-            cfn_client = AwsHelper.create_boto3_client('cloudformation')
+            cfn_client = AwsHelper.create_boto3_client('cloudformation', aws_config=aws_config)
 
             # Verify stack ownership
             success, stack, error_message = self._ensure_stack_ownership(ctx, stack_name, 'delete')

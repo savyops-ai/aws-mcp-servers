@@ -17,7 +17,7 @@
 import datetime
 import json
 import time
-from awslabs.eks_mcp_server.aws_helper import AwsHelper
+from awslabs.eks_mcp_server.aws_helper import AwsHelper, AWSConfig
 from awslabs.eks_mcp_server.logging_helper import LogLevel, log_with_request_id
 from awslabs.eks_mcp_server.models import CloudWatchLogsResponse, CloudWatchMetricsResponse
 from mcp.server.fastmcp import Context
@@ -86,6 +86,7 @@ class CloudWatchHandler:
     async def get_cloudwatch_logs(
         self,
         ctx: Context,
+        aws_config: AWSConfig,
         resource_type: str = Field(
             ...,
             description='Resource type to search logs for. Valid values: "pod", "node", "container". This determines how logs are filtered.',
@@ -170,6 +171,7 @@ class CloudWatchHandler:
             limit: Maximum number of log entries to return
             filter_pattern: Additional CloudWatch Logs filter pattern
             fields: Custom fields to include in the query results
+            aws_config: AWS configuration containing credentials and region
 
         Returns:
             CloudWatchLogsResponse with log entries and resource information
@@ -197,7 +199,7 @@ class CloudWatchHandler:
             start_dt, end_dt = self.resolve_time_range(start_time, end_time, minutes)
 
             # Create CloudWatch Logs client
-            logs = AwsHelper.create_boto3_client('logs')
+            logs = AwsHelper.create_boto3_client('logs', aws_config=aws_config)
 
             # Determine the log group based on log_type
             known_types = {'application', 'host', 'performance', 'dataplane'}

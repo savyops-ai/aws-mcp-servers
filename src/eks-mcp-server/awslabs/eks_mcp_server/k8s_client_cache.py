@@ -15,7 +15,7 @@
 """Kubernetes client cache for the EKS MCP Server."""
 
 import base64
-from awslabs.eks_mcp_server.aws_helper import AwsHelper
+from awslabs.eks_mcp_server.aws_helper import AwsHelper, AWSConfig
 from awslabs.eks_mcp_server.k8s_apis import K8sApis
 from cachetools import TTLCache
 
@@ -60,9 +60,9 @@ class K8sClientCache:
 
         self._initialized = True
 
-    def _get_sts_client(self):
+    def _get_sts_client(self, aws_config: AWSConfig):
         """Get the STS client with event handlers registered."""
-        sts_client = AwsHelper.create_boto3_client('sts')
+        sts_client = AwsHelper.create_boto3_client('sts', aws_config=aws_config)
 
         # Register STS event handlers only once
         if not self._sts_event_handlers_registered:
@@ -88,11 +88,12 @@ class K8sClientCache:
         if K8S_AWS_ID_HEADER in request.context:
             request.headers[K8S_AWS_ID_HEADER] = request.context[K8S_AWS_ID_HEADER]
 
-    def _get_cluster_credentials(self, cluster_name: str):
+    def _get_cluster_credentials(self, cluster_name: str, aws_config: AWSConfig) -> tuple:
         """Get credentials for an EKS cluster (private method).
 
         Args:
             cluster_name: Name of the EKS cluster
+            aws_config: AWS configuration containing credentials and region
 
         Returns:
             Tuple of (endpoint, token, ca_data)
@@ -101,8 +102,8 @@ class K8sClientCache:
             ValueError: If the cluster credentials are invalid
             Exception: If there's an error getting the cluster credentials
         """
-        eks_client = AwsHelper.create_boto3_client('eks')
-        sts_client = self._get_sts_client()
+        eks_client = AwsHelper.create_boto3_client('eks', aws_config=aws_config)
+        sts_client = self._get_sts_client(aws_config=aws_config)
 
         # Get cluster details
         response = eks_client.describe_cluster(name=cluster_name)
@@ -124,13 +125,14 @@ class K8sClientCache:
 
         return endpoint, token, ca_data
 
-    def get_client(self, cluster_name: str) -> K8sApis:
+    def get_client(self, cluster_name: str, aws_config: AWSConfig) -> K8sApis:
         """Get a Kubernetes client for the specified cluster.
 
         This is the only public method to access K8s API clients.
 
         Args:
             cluster_name: Name of the EKS cluster
+            aws_config: AWS configuration containing credentials and region
 
         Returns:
             K8sApis instance
@@ -142,7 +144,7 @@ class K8sClientCache:
         if cluster_name not in self._client_cache:
             try:
                 # Create a new client
-                endpoint, token, ca_data = self._get_cluster_credentials(cluster_name)
+                endpoint, token, ca_data = self._get_cluster_credentials(cluster_name, aws_config)
 
                 # Validate credentials
                 if not endpoint or not token or endpoint is None or token is None:
